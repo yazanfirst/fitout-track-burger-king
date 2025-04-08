@@ -1,4 +1,3 @@
-
 import { supabase } from '@/integrations/supabase/client';
 import { Project, ScheduleItem, OrderItem, ResponsibilityItem } from '@/data/mockData';
 import { Database } from '@/integrations/supabase/types';
@@ -12,12 +11,10 @@ export const getProjects = async () => {
     
     if (error) {
       console.error('Error fetching projects:', error);
-      // Fallback to mock data if there's an error
       const { projects } = await import('@/data/mockData');
       return projects;
     }
     
-    // Map Supabase data to match the expected Project type
     const mappedData = data.map(project => ({
       id: project.id,
       name: project.name,
@@ -27,10 +24,9 @@ export const getProjects = async () => {
       startDate: project.start_date,
       endDate: project.end_date,
       budget: project.budget || 0,
-      contractorProgress: 0, // Default values since not in DB
-      ownerProgress: 0,      // Default values since not in DB
-      brand: 'BK' as 'BK' | 'TC', // Default value
-      // Add project status object
+      contractorProgress: 0,
+      ownerProgress: 0,
+      brand: 'BK' as 'BK' | 'TC',
       status: {
         orders: 0,
         ordersTotal: 10,
@@ -61,21 +57,19 @@ export const getScheduleItems = async (projectId: string) => {
     
     if (error) {
       console.error('Error fetching schedule items:', error);
-      // Fallback to mock data
       const { schedules } = await import('@/data/mockData');
       return Object.values(schedules).flat().filter(item => item.projectId === projectId);
     }
     
-    // Map Supabase data to match the expected ScheduleItem type
     const mappedData = data.map(item => ({
       id: item.id,
       projectId: item.project_id,
       task: item.title, 
       plannedStart: item.start_date,
       plannedEnd: item.end_date,
-      actualStart: "", // Default values since these might not be in DB
-      actualEnd: "",   // Default values since these might not be in DB
-      delayDays: 0,    // Default values since these might not be in DB
+      actualStart: "",
+      actualEnd: "",
+      delayDays: 0,
       description: item.description || ""
     }));
     
@@ -97,12 +91,10 @@ export const getOrderItems = async (projectId: string) => {
     
     if (error) {
       console.error('Error fetching order items:', error);
-      // Fallback to mock data
       const { orders } = await import('@/data/mockData');
       return Object.values(orders).flat().filter(item => item.projectId === projectId);
     }
     
-    // Map Supabase data to match the expected OrderItem type
     const mappedData = data.map(item => ({
       id: item.id,
       projectId: item.project_id,
@@ -133,12 +125,10 @@ export const getResponsibilityItems = async (projectId: string) => {
     
     if (error) {
       console.error('Error fetching responsibility items:', error);
-      // Fallback to mock data
       const { responsibilities } = await import('@/data/mockData');
       return Object.values(responsibilities).flat().filter(item => item.projectId === projectId);
     }
     
-    // Map Supabase data to match the expected ResponsibilityItem type
     const mappedData = data.map(item => ({
       id: item.id,
       projectId: item.project_id,
@@ -160,7 +150,6 @@ export const getResponsibilityItems = async (projectId: string) => {
 // Update a project
 export const updateProject = async (projectId: string, updates: Partial<Project>) => {
   try {
-    // Convert from Project structure to database structure
     const dbUpdates: any = {};
     if ('name' in updates) dbUpdates.name = updates.name;
     if ('location' in updates) dbUpdates.location = updates.location;
@@ -170,7 +159,6 @@ export const updateProject = async (projectId: string, updates: Partial<Project>
     if ('startDate' in updates) dbUpdates.start_date = updates.startDate;
     if ('endDate' in updates) dbUpdates.end_date = updates.endDate;
     
-    // Only use string status, not the complex status object
     if ('status' in updates && typeof updates.status === 'string') {
       dbUpdates.status = updates.status;
     }
@@ -184,7 +172,6 @@ export const updateProject = async (projectId: string, updates: Partial<Project>
     
     if (error) {
       console.error('Error updating project:', error);
-      // Fallback to mock data
       const { projects } = await import('@/data/mockData');
       const projectIndex = projects.findIndex(p => p.id === projectId);
       
@@ -195,7 +182,6 @@ export const updateProject = async (projectId: string, updates: Partial<Project>
       return null;
     }
     
-    // Map back to Project type
     return {
       id: data.id,
       name: data.name,
@@ -205,9 +191,9 @@ export const updateProject = async (projectId: string, updates: Partial<Project>
       startDate: data.start_date,
       endDate: data.end_date,
       budget: data.budget || 0,
-      contractorProgress: 0, // Default values 
-      ownerProgress: 0,      // Default values
-      brand: 'BK' as 'BK' | 'TC', // Default value
+      contractorProgress: 0,
+      ownerProgress: 0,
+      brand: 'BK' as 'BK' | 'TC',
       status: {
         orders: 0,
         ordersTotal: 10,
@@ -228,16 +214,15 @@ export const updateProject = async (projectId: string, updates: Partial<Project>
 // Create a new project
 export const createProject = async (projectData: Omit<Project, 'id'>) => {
   try {
-    // Type-safe access to properties using type casting if necessary
     const dbProject = {
       name: projectData.name,
       location: projectData.location || '',
-      client: projectData.client || '',
+      client: projectData.client as string || '',
       notes: projectData.notes || '',
-      budget: projectData.budget || 0,
+      budget: projectData.budget as number || 0,
       status: typeof projectData.status === 'string' ? projectData.status : 'planning',
-      start_date: projectData.startDate || new Date().toISOString(),
-      end_date: projectData.endDate || new Date(new Date().setMonth(new Date().getMonth() + 3)).toISOString()
+      start_date: projectData.startDate as string || new Date().toISOString(),
+      end_date: projectData.endDate as string || new Date(new Date().setMonth(new Date().getMonth() + 3)).toISOString()
     };
     
     const { data, error } = await supabase
@@ -248,15 +233,13 @@ export const createProject = async (projectData: Omit<Project, 'id'>) => {
       
     if (error) {
       console.error('Error creating project:', error);
-      // Fallback to mock data
       const newProject = {
         ...projectData,
-        id: `p-${Date.now()}`, // Generate a unique ID
+        id: `p-${Date.now()}`,
       };
       return newProject as Project;
     }
     
-    // Map back to Project type
     return {
       id: data.id,
       name: data.name,
@@ -266,9 +249,9 @@ export const createProject = async (projectData: Omit<Project, 'id'>) => {
       startDate: data.start_date,
       endDate: data.end_date,
       budget: data.budget || 0,
-      contractorProgress: 0, // Default values 
-      ownerProgress: 0,      // Default values
-      brand: projectData.brand || ('BK' as 'BK' | 'TC'), // Use provided brand or default
+      contractorProgress: 0,
+      ownerProgress: 0,
+      brand: projectData.brand || ('BK' as 'BK' | 'TC'),
       status: {
         orders: 0,
         ordersTotal: 10,
@@ -289,17 +272,15 @@ export const createProject = async (projectData: Omit<Project, 'id'>) => {
 // Create a schedule item
 export const createScheduleItem = async (itemData: Omit<ScheduleItem, 'id'>) => {
   try {
-    // Extract properties safely, handling undefined cases
     const { task, plannedStart, plannedEnd, projectId } = itemData;
     
-    // Convert from ScheduleItem structure to database structure
     const dbItem = {
       project_id: projectId,
       title: task,
       start_date: plannedStart,
       end_date: plannedEnd,
-      description: itemData.description || '',  // Safely access optional fields
-      status: itemData.status || 'pending'      // Safely access optional fields
+      description: itemData.description as string || '',
+      status: itemData.status as string || 'pending'
     };
     
     const { data, error } = await supabase
@@ -310,15 +291,13 @@ export const createScheduleItem = async (itemData: Omit<ScheduleItem, 'id'>) => 
       
     if (error) {
       console.error('Error creating schedule item:', error);
-      // Fallback to mock data
       const newItem = {
         ...itemData,
-        id: `s-${Date.now()}`, // Generate a unique ID
+        id: `s-${Date.now()}`,
       };
       return newItem as ScheduleItem;
     }
     
-    // Map back to ScheduleItem type
     return {
       id: data.id,
       projectId: data.project_id,
@@ -339,7 +318,6 @@ export const createScheduleItem = async (itemData: Omit<ScheduleItem, 'id'>) => 
 // Update a schedule item
 export const updateScheduleItem = async (itemId: string, updates: Partial<ScheduleItem>) => {
   try {
-    // Convert from ScheduleItem structure to database structure
     const dbUpdates: any = {};
     if ('task' in updates) dbUpdates.title = updates.task;
     if ('plannedStart' in updates) dbUpdates.start_date = updates.plannedStart;
@@ -356,13 +334,10 @@ export const updateScheduleItem = async (itemId: string, updates: Partial<Schedu
       
     if (error) {
       console.error('Error updating schedule item:', error);
-      // Fallback to mock data
       const { schedules } = await import('@/data/mockData');
       
-      // Find the item to update across all project schedules
       let updatedItem: ScheduleItem | null = null;
       
-      // Process each project's schedule items
       Object.keys(schedules).forEach(projectId => {
         const items = schedules[projectId];
         const itemIndex = items.findIndex((item: ScheduleItem) => item.id === itemId);
@@ -375,7 +350,6 @@ export const updateScheduleItem = async (itemId: string, updates: Partial<Schedu
       return updatedItem;
     }
     
-    // Map back to ScheduleItem type
     return {
       id: data.id,
       projectId: data.project_id,
@@ -416,7 +390,7 @@ export const deleteScheduleItem = async (itemId: string) => {
 // Upload file to storage
 export const uploadFile = async (file: File, projectId: string, type: 'drawing' | 'photo') => {
   try {
-    const fileExt = file.name.split('.').pop();
+    const fileExt = file.name.split('.').pop()?.toLowerCase();
     const fileName = `${projectId}/${type}_${Date.now()}.${fileExt}`;
     
     const { data, error } = await supabase
@@ -429,7 +403,6 @@ export const uploadFile = async (file: File, projectId: string, type: 'drawing' 
       return null;
     }
     
-    // Get public URL of the uploaded file
     const { data: urlData } = supabase
       .storage
       .from('project_files')
@@ -477,9 +450,7 @@ export const initializeDatabase = async (mockData: {
   try {
     console.info('Initializing database with mock data...');
     
-    // Only attempt to initialize if there are mock projects
     if (mockData.projects && mockData.projects.length > 0) {
-      // First check if projects already exist
       const { data: existingProjects } = await supabase
         .from('projects')
         .select('id')
@@ -490,9 +461,7 @@ export const initializeDatabase = async (mockData: {
         return { success: true, message: 'Database already contains data' };
       }
       
-      // Format projects for database insertion
       const dbProjects = mockData.projects.map(p => ({
-        // Use UUID if available, otherwise generate a new one
         id: p.id && p.id.match(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i) ? p.id : undefined,
         name: p.name,
         location: p.location || null,
@@ -504,7 +473,6 @@ export const initializeDatabase = async (mockData: {
         end_date: p.endDate || new Date(new Date().setMonth(new Date().getMonth() + 3)).toISOString()
       }));
       
-      // Insert projects one by one to avoid array type issues
       for (const project of dbProjects) {
         const { error } = await supabase
           .from('projects')
@@ -516,8 +484,6 @@ export const initializeDatabase = async (mockData: {
       }
       
       console.log('Successfully initialized projects');
-      
-      // Could add additional initializations for schedules, orders, etc. here
     }
     
     return { success: true, message: 'Database initialized with mock data' };
@@ -525,4 +491,196 @@ export const initializeDatabase = async (mockData: {
     console.error('Error initializing database:', error);
     return { success: false, error };
   }
+};
+
+// Upload and parse schedule file
+export const uploadScheduleFile = async (projectId: string, file: File) => {
+  try {
+    const fileExt = file.name.split('.').pop()?.toLowerCase();
+    const fileName = `${projectId}/schedules/schedule_${Date.now()}.${fileExt}`;
+    
+    const { data, error } = await supabase
+      .storage
+      .from('project_files')
+      .upload(fileName, file);
+      
+    if (error) {
+      console.error('Error uploading schedule file:', error);
+      return null;
+    }
+    
+    const { data: urlData } = supabase
+      .storage
+      .from('project_files')
+      .getPublicUrl(fileName);
+      
+    return urlData?.publicUrl;
+  } catch (error) {
+    console.error('Error uploading schedule file:', error);
+    return null;
+  }
+};
+
+// Parse schedule file
+export const parseScheduleFile = async (projectId: string, file: File) => {
+  try {
+    const fileUrl = await uploadScheduleFile(projectId, file);
+    
+    if (!fileUrl) {
+      return { error: "Failed to upload file" };
+    }
+    
+    const fileType = file.name.split('.').pop()?.toLowerCase();
+    
+    if (fileType === 'csv') {
+      return await parseCSVFile(file, projectId);
+    }
+    
+    if (fileType === 'xlsx' || fileType === 'xls') {
+      return mockExcelParsing(projectId);
+    } else if (fileType === 'pdf') {
+      return mockPDFParsing(projectId);
+    }
+    
+    return { error: "Unsupported file format" };
+  } catch (error) {
+    console.error('Error parsing schedule file:', error);
+    return { error: "Failed to parse file" };
+  }
+};
+
+// Parse CSV file
+const parseCSVFile = async (file: File, projectId: string) => {
+  return new Promise<{ items?: Omit<ScheduleItem, 'id'>[]; error?: string }>((resolve) => {
+    const reader = new FileReader();
+    
+    reader.onload = (e) => {
+      try {
+        const text = e.target?.result as string;
+        const lines = text.split('\n');
+        const headers = lines[0].split(',').map(header => header.trim().toLowerCase());
+        
+        const taskIndex = headers.findIndex(h => h.includes('task') || h.includes('activity') || h.includes('description'));
+        const startIndex = headers.findIndex(h => h.includes('start') || h.includes('begin'));
+        const endIndex = headers.findIndex(h => h.includes('end') || h.includes('finish'));
+        
+        if (taskIndex === -1 || startIndex === -1 || endIndex === -1) {
+          resolve({ error: "CSV file doesn't have required columns (task/activity, start date, end date)" });
+          return;
+        }
+        
+        const items: Omit<ScheduleItem, 'id'>[] = [];
+        
+        for (let i = 1; i < lines.length; i++) {
+          if (!lines[i].trim()) continue;
+          
+          const values = lines[i].split(',').map(val => val.trim());
+          
+          if (values.length < Math.max(taskIndex, startIndex, endIndex) + 1) continue;
+          
+          const task = values[taskIndex];
+          let startDate = values[startIndex];
+          let endDate = values[endIndex];
+          
+          try {
+            let parsedStart = new Date(startDate);
+            let parsedEnd = new Date(endDate);
+            
+            if (isNaN(parsedStart.getTime()) || isNaN(parsedEnd.getTime())) {
+              continue;
+            }
+            
+            items.push({
+              projectId,
+              task,
+              plannedStart: parsedStart.toISOString(),
+              plannedEnd: parsedEnd.toISOString(),
+              actualStart: '',
+              actualEnd: '',
+              delayDays: 0
+            });
+          } catch (e) {
+            console.error("Error parsing date:", e);
+            continue;
+          }
+        }
+        
+        if (items.length === 0) {
+          resolve({ error: "No valid schedule items found in the CSV file" });
+        } else {
+          resolve({ items });
+        }
+      } catch (error) {
+        console.error("Error parsing CSV:", error);
+        resolve({ error: "Failed to parse CSV file" });
+      }
+    };
+    
+    reader.onerror = () => {
+      resolve({ error: "Failed to read file" });
+    };
+    
+    reader.readAsText(file);
+  });
+};
+
+// Mock Excel parsing (for demo purposes)
+const mockExcelParsing = (projectId: string) => {
+  const mockItems: Omit<ScheduleItem, 'id'>[] = [
+    {
+      projectId,
+      task: "Foundation Work",
+      plannedStart: new Date().toISOString(),
+      plannedEnd: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString(),
+      actualStart: '',
+      actualEnd: '',
+      delayDays: 0
+    },
+    {
+      projectId,
+      task: "Framing",
+      plannedStart: new Date(Date.now() + 15 * 24 * 60 * 60 * 1000).toISOString(),
+      plannedEnd: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+      actualStart: '',
+      actualEnd: '',
+      delayDays: 0
+    },
+    {
+      projectId,
+      task: "Electrical Installation",
+      plannedStart: new Date(Date.now() + 31 * 24 * 60 * 60 * 1000).toISOString(),
+      plannedEnd: new Date(Date.now() + 45 * 24 * 60 * 60 * 1000).toISOString(),
+      actualStart: '',
+      actualEnd: '',
+      delayDays: 0
+    }
+  ];
+  
+  return { items: mockItems };
+};
+
+// Mock PDF parsing (for demo purposes)
+const mockPDFParsing = (projectId: string) => {
+  const mockItems: Omit<ScheduleItem, 'id'>[] = [
+    {
+      projectId,
+      task: "Site Preparation",
+      plannedStart: new Date().toISOString(),
+      plannedEnd: new Date(Date.now() + 10 * 24 * 60 * 60 * 1000).toISOString(),
+      actualStart: '',
+      actualEnd: '',
+      delayDays: 0
+    },
+    {
+      projectId,
+      task: "Demolition",
+      plannedStart: new Date(Date.now() + 11 * 24 * 60 * 60 * 1000).toISOString(),
+      plannedEnd: new Date(Date.now() + 20 * 24 * 60 * 60 * 1000).toISOString(),
+      actualStart: '',
+      actualEnd: '',
+      delayDays: 0
+    }
+  ];
+  
+  return { items: mockItems };
 };

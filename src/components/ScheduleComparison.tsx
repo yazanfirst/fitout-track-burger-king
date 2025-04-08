@@ -8,12 +8,13 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { DatePicker } from "@/components/ui/date-picker";
-import { PlusCircle } from "lucide-react";
+import { PlusCircle, Upload, FileText } from "lucide-react";
 import { Project, ScheduleItem } from "@/data/mockData";
-import { format, differenceInCalendarDays } from "date-fns";
-import { createScheduleItem, updateScheduleItem, deleteScheduleItem } from "@/lib/api";
+import { format, differenceInCalendarDays, parse } from "date-fns";
+import { createScheduleItem, updateScheduleItem, deleteScheduleItem, uploadScheduleFile, parseScheduleFile } from "@/lib/api";
 import { useToast } from "@/components/ui/use-toast";
 import { Bar, BarChart, ResponsiveContainer, XAxis, YAxis } from "recharts";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 
 interface ScheduleComparisonProps {
   project: Project;
@@ -24,6 +25,7 @@ export function ScheduleComparison({ project, scheduleItems }: ScheduleCompariso
   const { toast } = useToast();
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [isUpdateDialogOpen, setIsUpdateDialogOpen] = useState(false);
+  const [isUploadDialogOpen, setIsUploadDialogOpen] = useState(false);
   const [newItem, setNewItem] = useState<Omit<ScheduleItem, 'id'>>({
     projectId: project.id,
     task: "",
@@ -35,6 +37,10 @@ export function ScheduleComparison({ project, scheduleItems }: ScheduleCompariso
   });
   const [selectedItem, setSelectedItem] = useState<ScheduleItem | null>(null);
   const [loading, setLoading] = useState(false);
+  const [uploadLoading, setUploadLoading] = useState(false);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [fileParseError, setFileParseError] = useState<string | null>(null);
+  const [parsedItems, setParsedItems] = useState<Omit<ScheduleItem, 'id'>[]>([]);
 
   // Graph data transformation
   const graphData = scheduleItems.map(item => ({
@@ -49,6 +55,104 @@ export function ScheduleComparison({ project, scheduleItems }: ScheduleCompariso
         new Date(item.actualStart)
       ) : 0
   }));
+
+  // Handle file selection
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!e.target.files || e.target.files.length === 0) {
+      setSelectedFile(null);
+      setParsedItems([]);
+      setFileParseError(null);
+      return;
+    }
+    
+    const file = e.target.files[0];
+    setSelectedFile(file);
+    setFileParseError(null);
+    setParsedItems([]);
+    
+    // Check file type
+    const fileExt = file.name.split('.').pop()?.toLowerCase();
+    if (!fileExt || !['csv', 'xlsx', 'xls', 'pdf'].includes(fileExt)) {
+      setFileParseError("Unsupported file format. Please upload CSV, Excel, or PDF files.");
+      return;
+    }
+  };
+
+  // Handle file upload and parsing
+  const handleFileUpload = async () => {
+    if (!selectedFile) return;
+    
+    setUploadLoading(true);
+    setFileParseError(null);
+
+    try {
+      // Upload and parse file
+      const result = await parseScheduleFile(project.id, selectedFile);
+      
+      if (result.error) {
+        setFileParseError(result.error);
+      } else if (result.items && result.items.length > 0) {
+        setParsedItems(result.items);
+        toast({
+          title: "File Parsed Successfully",
+          description: `${result.items.length} items found in the file.`
+        });
+      } else {
+        setFileParseError("No valid schedule items found in the file.");
+      }
+    } catch (error) {
+      console.error("Error uploading file:", error);
+      setFileParseError("Failed to upload and parse file. Please try again.");
+    } finally {
+      setUploadLoading(false);
+    }
+  };
+
+  // Import parsed items
+  const handleImportItems = async () => {
+    if (parsedItems.length === 0) return;
+    
+    setUploadLoading(true);
+    
+    try {
+      let successCount = 0;
+      let errorCount = 0;
+      
+      // Create each item
+      for (const item of parsedItems) {
+        try {
+          await createScheduleItem({
+            ...item,
+            projectId: project.id
+          });
+          successCount++;
+        } catch (error) {
+          console.error("Error importing item:", error);
+          errorCount++;
+        }
+      }
+      
+      // Close dialog and show success message
+      setIsUploadDialogOpen(false);
+      toast({
+        title: "Import Complete",
+        description: `Successfully imported ${successCount} items. ${errorCount > 0 ? `Failed to import ${errorCount} items.` : ''}`
+      });
+      
+      // Reset file and parsed items
+      setSelectedFile(null);
+      setParsedItems([]);
+    } catch (error) {
+      console.error("Error importing items:", error);
+      toast({
+        title: "Error",
+        description: "Failed to import items. Please try again.",
+        variant: "destructive"
+      });
+    } finally {
+      setUploadLoading(false);
+    }
+  };
 
   // Handle add new item
   const handleAddItem = async () => {
@@ -187,10 +291,16 @@ export function ScheduleComparison({ project, scheduleItems }: ScheduleCompariso
             <CardTitle>Schedule Comparison</CardTitle>
             <CardDescription>Compare planned vs. actual schedules</CardDescription>
           </div>
-          <Button onClick={() => setIsAddDialogOpen(true)} size="sm">
-            <PlusCircle className="mr-1 h-4 w-4" />
-            Add Task
-          </Button>
+          <div className="flex space-x-2">
+            <Button onClick={() => setIsUploadDialogOpen(true)} variant="outline" size="sm">
+              <Upload className="mr-1 h-4 w-4" />
+              Import Schedule
+            </Button>
+            <Button onClick={() => setIsAddDialogOpen(true)} size="sm">
+              <PlusCircle className="mr-1 h-4 w-4" />
+              Add Task
+            </Button>
+          </div>
         </div>
       </CardHeader>
       <CardContent>
@@ -217,7 +327,7 @@ export function ScheduleComparison({ project, scheduleItems }: ScheduleCompariso
                   {scheduleItems.length === 0 ? (
                     <TableRow>
                       <TableCell colSpan={7} className="text-center py-4 text-muted-foreground">
-                        No schedule items added yet. Click "Add Task" to get started.
+                        No schedule items added yet. Click "Add Task" or "Import Schedule" to get started.
                       </TableCell>
                     </TableRow>
                   ) : (
@@ -265,7 +375,7 @@ export function ScheduleComparison({ project, scheduleItems }: ScheduleCompariso
             <div className="w-full h-96">
               {scheduleItems.length === 0 ? (
                 <div className="flex items-center justify-center h-full text-muted-foreground">
-                  No schedule items added yet. Click "Add Task" to get started.
+                  No schedule items added yet. Click "Add Task" or "Import Schedule" to get started.
                 </div>
               ) : (
                 <ResponsiveContainer width="100%" height="100%">
@@ -463,6 +573,86 @@ export function ScheduleComparison({ project, scheduleItems }: ScheduleCompariso
               disabled={loading || !selectedItem || !selectedItem.task || !selectedItem.plannedStart || !selectedItem.plannedEnd}
             >
               {loading ? "Updating..." : "Update Schedule Item"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* File Upload Dialog */}
+      <Dialog open={isUploadDialogOpen} onOpenChange={setIsUploadDialogOpen}>
+        <DialogContent className="sm:max-w-[550px]">
+          <DialogHeader>
+            <DialogTitle>Import Schedule from File</DialogTitle>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div>
+              <Label htmlFor="schedule-file">Upload Schedule File</Label>
+              <div className="mt-2 flex items-center gap-2">
+                <Input
+                  id="schedule-file"
+                  type="file"
+                  accept=".csv,.xlsx,.xls,.pdf"
+                  onChange={handleFileSelect}
+                  className="flex-1"
+                />
+                <Button 
+                  onClick={handleFileUpload}
+                  disabled={!selectedFile || uploadLoading}
+                  size="sm"
+                >
+                  {uploadLoading ? "Parsing..." : "Parse"}
+                </Button>
+              </div>
+              <div className="text-xs text-muted-foreground mt-1">
+                Supported formats: CSV, Excel (xlsx, xls), PDF
+              </div>
+            </div>
+
+            {fileParseError && (
+              <Alert variant="destructive">
+                <AlertDescription>{fileParseError}</AlertDescription>
+              </Alert>
+            )}
+
+            {parsedItems.length > 0 && (
+              <div className="mt-4">
+                <h3 className="text-sm font-medium mb-2">Found {parsedItems.length} schedule items:</h3>
+                <div className="max-h-60 overflow-y-auto border rounded-md">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Task</TableHead>
+                        <TableHead>Planned Start</TableHead>
+                        <TableHead>Planned End</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {parsedItems.map((item, index) => (
+                        <TableRow key={index}>
+                          <TableCell>{item.task}</TableCell>
+                          <TableCell>{formatDate(item.plannedStart)}</TableCell>
+                          <TableCell>{formatDate(item.plannedEnd)}</TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              </div>
+            )}
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setIsUploadDialogOpen(false)}
+              disabled={uploadLoading}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleImportItems}
+              disabled={uploadLoading || parsedItems.length === 0}
+            >
+              {uploadLoading ? "Importing..." : "Import Items"}
             </Button>
           </DialogFooter>
         </DialogContent>
