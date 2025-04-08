@@ -8,7 +8,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { DatePicker } from "@/components/ui/date-picker";
-import { PlusCircle, Upload, FileText, Calendar, CalendarX, X, TrashIcon } from "lucide-react";
+import { PlusCircle, Upload, FileText, Calendar, CalendarX, X, TrashIcon, AlertCircle, Download } from "lucide-react";
 import { Project, ScheduleItem } from "@/data/mockData";
 import { format, differenceInCalendarDays } from "date-fns";
 import { createScheduleItem, updateScheduleItem, deleteScheduleItem, parseScheduleFile, ensureStorageBucketsExist } from "@/lib/api";
@@ -28,6 +28,7 @@ export function ScheduleComparison({ project, scheduleItems, onScheduleUpdate }:
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [isUpdateDialogOpen, setIsUpdateDialogOpen] = useState(false);
   const [isUploadDialogOpen, setIsUploadDialogOpen] = useState(false);
+  const [isBatchUpdateDialogOpen, setIsBatchUpdateDialogOpen] = useState(false);
   const [isConfirmDeleteOpen, setIsConfirmDeleteOpen] = useState(false);
   const [itemToDelete, setItemToDelete] = useState<string | null>(null);
   const [newItem, setNewItem] = useState<Omit<ScheduleItem, 'id'>>({
@@ -49,14 +50,33 @@ export function ScheduleComparison({ project, scheduleItems, onScheduleUpdate }:
   const [importSuccessful, setImportSuccessful] = useState(false);
   const [pdfUrl, setPdfUrl] = useState<string | null>(null);
   const [showPdfViewer, setShowPdfViewer] = useState(false);
+  const [itemsToUpdate, setItemsToUpdate] = useState<ScheduleItem[]>([]);
+  const [storageAlert, setStorageAlert] = useState<{
+    show: boolean;
+    message: string;
+  }>({ show: false, message: "" });
   
   // Ensure storage buckets exist on component load
   useEffect(() => {
-    ensureStorageBucketsExist().then(success => {
-      if (!success) {
-        console.warn("Failed to ensure storage buckets exist");
-      }
-    });
+    ensureStorageBucketsExist()
+      .then(success => {
+        if (!success) {
+          console.warn("Failed to ensure storage buckets exist");
+          setStorageAlert({
+            show: true,
+            message: "Storage system is not properly configured. Please contact support."
+          });
+        } else {
+          setStorageAlert({ show: false, message: "" });
+        }
+      })
+      .catch(error => {
+        console.error("Error checking storage buckets:", error);
+        setStorageAlert({
+          show: true, 
+          message: "Could not verify storage configuration. Some features may be limited."
+        });
+      });
   }, []);
 
   // Reset new item form when project changes
@@ -80,7 +100,7 @@ export function ScheduleComparison({ project, scheduleItems, onScheduleUpdate }:
       new Date(item.plannedEnd),
       new Date(item.plannedStart)
     ),
-    actual: item.actualEnd ? 
+    actual: item.actualEnd && item.actualStart ? 
       differenceInCalendarDays(
         new Date(item.actualEnd),
         new Date(item.actualStart)
@@ -156,6 +176,10 @@ export function ScheduleComparison({ project, scheduleItems, onScheduleUpdate }:
         error = result.error;
         
         if (error) {
+          setStorageAlert({
+            show: true,
+            message: "Drawing storage is not properly configured. Please check your storage settings."
+          });
           throw new Error(`Error uploading PDF: ${error.message}`);
         }
         
@@ -206,6 +230,7 @@ export function ScheduleComparison({ project, scheduleItems, onScheduleUpdate }:
       // Show PDF viewer
       setShowPdfViewer(true);
       setImportSuccessful(true);
+      setStorageAlert({ show: false, message: "" });
       
       toast({
         title: "PDF Uploaded Successfully",
@@ -242,6 +267,8 @@ export function ScheduleComparison({ project, scheduleItems, onScheduleUpdate }:
       } else if (result.items && result.items.length > 0) {
         setParsedItems(result.items);
         setImportSuccessful(true);
+        setStorageAlert({ show: false, message: "" });
+        
         toast({
           title: "File Parsed Successfully",
           description: result.message || `${result.items.length} items found in the file.`
@@ -257,6 +284,24 @@ export function ScheduleComparison({ project, scheduleItems, onScheduleUpdate }:
             title: "Items Imported",
             description: `${result.items.length} items have been imported into your schedule.`
           });
+        } else {
+          // Update batch update dialog with parsed items
+          setItemsToUpdate(result.items.map(item => ({
+            ...item,
+            id: '', // Will be assigned when saved
+            projectId: project.id,
+            task: item.task || '',
+            plannedStart: item.plannedStart || '',
+            plannedEnd: item.plannedEnd || '',
+            actualStart: item.actualStart || '',
+            actualEnd: item.actualEnd || '',
+            delayDays: item.delayDays || 0,
+            description: item.description || ''
+          })) as ScheduleItem[]);
+          
+          // Close upload dialog and open batch update dialog
+          setIsUploadDialogOpen(false);
+          setIsBatchUpdateDialogOpen(true);
         }
       } else {
         setFileParseError("No valid schedule items found in the file.");
@@ -328,6 +373,80 @@ export function ScheduleComparison({ project, scheduleItems, onScheduleUpdate }:
       });
     } finally {
       setUploadLoading(false);
+    }
+  };
+
+  // Handle batch update of actual dates
+  const handleBatchUpdate = async () => {
+    if (itemsToUpdate.length === 0) return;
+    
+    setLoading(true);
+    
+    try {
+      let successCount = 0;
+      let errorCount = 0;
+      
+      // Process each item
+      for (const item of itemsToUpdate) {
+        try {
+          // Calculate delay days if both actual dates are provided
+          let delayDays = 0;
+          if (item.actualStart && item.actualEnd && item.plannedStart && item.plannedEnd) {
+            const actualEndDate = new Date(item.actualEnd);
+            const plannedEndDate = new Date(item.plannedEnd);
+            delayDays = differenceInCalendarDays(actualEndDate, plannedEndDate);
+            if (delayDays < 0) delayDays = 0;
+          }
+          
+          const itemWithDelay = {
+            ...item,
+            delayDays
+          };
+          
+          // If item has an id, update it, otherwise create new
+          let result;
+          if (item.id && item.id.length > 0 && item.id !== '') {
+            // Update existing item
+            result = await updateScheduleItem(item.id, itemWithDelay);
+          } else {
+            // Create new item
+            result = await createScheduleItem(itemWithDelay);
+          }
+          
+          if (result) {
+            successCount++;
+          } else {
+            errorCount++;
+          }
+        } catch (error) {
+          console.error("Error processing item:", error);
+          errorCount++;
+        }
+      }
+      
+      // Close dialog and show success message
+      setIsBatchUpdateDialogOpen(false);
+      toast({
+        title: "Update Complete",
+        description: `Successfully processed ${successCount} items. ${errorCount > 0 ? `Failed to process ${errorCount} items.` : ''}`
+      });
+      
+      // Reset batch update items
+      setItemsToUpdate([]);
+      
+      // Notify parent to refresh data
+      if (onScheduleUpdate) {
+        onScheduleUpdate();
+      }
+    } catch (error) {
+      console.error("Error in batch update:", error);
+      toast({
+        title: "Error",
+        description: "Failed to update items. Please try again.",
+        variant: "destructive"
+      });
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -499,6 +618,44 @@ export function ScheduleComparison({ project, scheduleItems, onScheduleUpdate }:
     }
   };
 
+  // Handle batch update form change
+  const handleBatchItemChange = (index: number, field: keyof ScheduleItem, value: any) => {
+    setItemsToUpdate(prevItems => {
+      const newItems = [...prevItems];
+      newItems[index] = {
+        ...newItems[index],
+        [field]: value
+      };
+      
+      // Recalculate delay days if actual dates changed
+      if ((field === 'actualStart' || field === 'actualEnd') && 
+          newItems[index].actualStart && 
+          newItems[index].actualEnd && 
+          newItems[index].plannedStart && 
+          newItems[index].plannedEnd) {
+        const actualEndDate = new Date(newItems[index].actualEnd);
+        const plannedEndDate = new Date(newItems[index].plannedEnd);
+        let delayDays = differenceInCalendarDays(actualEndDate, plannedEndDate);
+        if (delayDays < 0) delayDays = 0;
+        newItems[index].delayDays = delayDays;
+      }
+      
+      return newItems;
+    });
+  };
+
+  // Filter for items with missing actual dates
+  const getItemsMissingActualDates = () => {
+    return scheduleItems.filter(item => !item.actualStart || !item.actualEnd);
+  };
+
+  // Open batch update dialog with existing items
+  const openActualDatesDialog = () => {
+    const missingItems = getItemsMissingActualDates();
+    setItemsToUpdate(missingItems);
+    setIsBatchUpdateDialogOpen(true);
+  };
+
   return (
     <Card className="mb-6">
       <CardHeader className="pb-2">
@@ -507,7 +664,16 @@ export function ScheduleComparison({ project, scheduleItems, onScheduleUpdate }:
             <CardTitle>Schedule Comparison</CardTitle>
             <CardDescription>Compare planned vs. actual schedules</CardDescription>
           </div>
-          <div className="flex space-x-2">
+          <div className="flex flex-wrap gap-2">
+            <Button 
+              onClick={openActualDatesDialog} 
+              variant="outline" 
+              size="sm"
+              disabled={getItemsMissingActualDates().length === 0}
+            >
+              <Calendar className="mr-1 h-4 w-4" />
+              Update Actual Dates
+            </Button>
             <Button onClick={() => setIsUploadDialogOpen(true)} variant="outline" size="sm">
               <Upload className="mr-1 h-4 w-4" />
               Import Schedule
@@ -520,6 +686,14 @@ export function ScheduleComparison({ project, scheduleItems, onScheduleUpdate }:
         </div>
       </CardHeader>
       <CardContent>
+        {/* Storage error alert */}
+        {storageAlert.show && (
+          <Alert variant="destructive" className="mb-4">
+            <AlertCircle className="h-4 w-4" />
+            <AlertDescription className="ml-2">{storageAlert.message}</AlertDescription>
+          </Alert>
+        )}
+        
         <Tabs defaultValue="list" className="w-full">
           <TabsList className="mb-4">
             <TabsTrigger value="list">List View</TabsTrigger>
@@ -553,12 +727,28 @@ export function ScheduleComparison({ project, scheduleItems, onScheduleUpdate }:
                         <TableCell className="font-medium">{item.task}</TableCell>
                         <TableCell className="hidden md:table-cell">{formatDate(item.plannedStart)}</TableCell>
                         <TableCell className="hidden md:table-cell">{formatDate(item.plannedEnd)}</TableCell>
-                        <TableCell className="hidden md:table-cell">{formatDate(item.actualStart)}</TableCell>
-                        <TableCell className="hidden md:table-cell">{formatDate(item.actualEnd)}</TableCell>
+                        <TableCell className="hidden md:table-cell">
+                          {item.actualStart ? (
+                            formatDate(item.actualStart)
+                          ) : (
+                            <span className="text-amber-500 text-sm font-medium">Not set</span>
+                          )}
+                        </TableCell>
+                        <TableCell className="hidden md:table-cell">
+                          {item.actualEnd ? (
+                            formatDate(item.actualEnd)
+                          ) : (
+                            <span className="text-amber-500 text-sm font-medium">Not set</span>
+                          )}
+                        </TableCell>
                         <TableCell>
-                          <span className={item.delayDays > 0 ? "text-red-500 font-medium" : ""}>
-                            {item.delayDays > 0 ? `+${item.delayDays}` : item.delayDays}
-                          </span>
+                          {item.actualEnd && item.plannedEnd ? (
+                            <span className={item.delayDays > 0 ? "text-red-500 font-medium" : "text-green-500 font-medium"}>
+                              {item.delayDays > 0 ? `+${item.delayDays}` : item.delayDays}
+                            </span>
+                          ) : (
+                            <span className="text-muted-foreground">-</span>
+                          )}
                         </TableCell>
                         <TableCell className="text-right">
                           <Button
@@ -613,8 +803,20 @@ export function ScheduleComparison({ project, scheduleItems, onScheduleUpdate }:
           <TabsContent value="pdf">
             {pdfUrl ? (
               <div className="w-full flex flex-col">
-                <div className="text-sm text-muted-foreground mb-2">
-                  Uploaded PDF schedule:
+                <div className="flex justify-between items-center mb-2">
+                  <div className="text-sm text-muted-foreground">
+                    Uploaded PDF schedule:
+                  </div>
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    onClick={() => {
+                      window.open(pdfUrl, '_blank');
+                    }}
+                  >
+                    <Download className="h-4 w-4 mr-1" />
+                    Download PDF
+                  </Button>
                 </div>
                 <iframe 
                   src={pdfUrl} 
@@ -816,6 +1018,32 @@ export function ScheduleComparison({ project, scheduleItems, onScheduleUpdate }:
                   />
                 </div>
               </div>
+
+              {selectedItem.actualStart && selectedItem.actualEnd && selectedItem.plannedStart && selectedItem.plannedEnd && (
+                <div className="bg-muted/30 p-3 rounded-md">
+                  <div className="text-sm font-medium mb-1">Schedule Analysis</div>
+                  <div className="flex flex-wrap gap-4 text-sm">
+                    <div>
+                      <span className="text-muted-foreground">Planned Duration:</span>{" "}
+                      {differenceInCalendarDays(new Date(selectedItem.plannedEnd), new Date(selectedItem.plannedStart))} days
+                    </div>
+                    <div>
+                      <span className="text-muted-foreground">Actual Duration:</span>{" "}
+                      {differenceInCalendarDays(new Date(selectedItem.actualEnd), new Date(selectedItem.actualStart))} days
+                    </div>
+                    <div>
+                      <span className="text-muted-foreground">Estimated Delay:</span>{" "}
+                      <span className={
+                        differenceInCalendarDays(new Date(selectedItem.actualEnd), new Date(selectedItem.plannedEnd)) > 0 
+                          ? "text-red-500 font-medium" 
+                          : "text-green-500 font-medium"
+                      }>
+                        {differenceInCalendarDays(new Date(selectedItem.actualEnd), new Date(selectedItem.plannedEnd))} days
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
           )}
           <DialogFooter>
@@ -833,6 +1061,99 @@ export function ScheduleComparison({ project, scheduleItems, onScheduleUpdate }:
               {loading ? "Updating..." : "Update Schedule Item"}
             </Button>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Batch Update Actual Dates Dialog */}
+      <Dialog open={isBatchUpdateDialogOpen} onOpenChange={setIsBatchUpdateDialogOpen}>
+        <DialogContent className="sm:max-w-[800px] max-h-[80vh] overflow-auto">
+          <DialogHeader>
+            <DialogTitle>Update Actual Dates</DialogTitle>
+          </DialogHeader>
+          
+          {itemsToUpdate.length === 0 ? (
+            <div className="py-6 text-center">
+              <div className="text-muted-foreground mb-2">
+                No items to update or all items already have actual dates set.
+              </div>
+              <Button variant="outline" onClick={() => setIsBatchUpdateDialogOpen(false)}>
+                Close
+              </Button>
+            </div>
+          ) : (
+            <>
+              <div className="grid gap-4 py-4">
+                <div className="text-sm text-muted-foreground mb-2">
+                  Update actual start and end dates for schedule items:
+                </div>
+                
+                <div className="rounded-md border overflow-x-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead className="w-[200px]">Task</TableHead>
+                        <TableHead>Planned Start</TableHead>
+                        <TableHead>Planned End</TableHead>
+                        <TableHead>Actual Start</TableHead>
+                        <TableHead>Actual End</TableHead>
+                        <TableHead>Delay</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {itemsToUpdate.map((item, index) => (
+                        <TableRow key={item.id || index} isStripe>
+                          <TableCell className="font-medium">{item.task}</TableCell>
+                          <TableCell>{formatDate(item.plannedStart)}</TableCell>
+                          <TableCell>{formatDate(item.plannedEnd)}</TableCell>
+                          <TableCell>
+                            <DatePicker
+                              date={item.actualStart ? new Date(item.actualStart) : undefined}
+                              setDate={(date) => 
+                                handleBatchItemChange(index, 'actualStart', date ? date.toISOString() : "")
+                              }
+                            />
+                          </TableCell>
+                          <TableCell>
+                            <DatePicker
+                              date={item.actualEnd ? new Date(item.actualEnd) : undefined}
+                              setDate={(date) => 
+                                handleBatchItemChange(index, 'actualEnd', date ? date.toISOString() : "")
+                              }
+                            />
+                          </TableCell>
+                          <TableCell>
+                            {item.actualEnd && item.plannedEnd ? (
+                              <span className={item.delayDays > 0 ? "text-red-500 font-medium" : "text-green-500 font-medium"}>
+                                {item.delayDays > 0 ? `+${item.delayDays}` : item.delayDays}
+                              </span>
+                            ) : (
+                              <span className="text-muted-foreground">-</span>
+                            )}
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              </div>
+              
+              <DialogFooter>
+                <Button
+                  variant="outline"
+                  onClick={() => setIsBatchUpdateDialogOpen(false)}
+                  disabled={loading}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  onClick={handleBatchUpdate}
+                  disabled={loading}
+                >
+                  {loading ? "Updating..." : "Save All Changes"}
+                </Button>
+              </DialogFooter>
+            </>
+          )}
         </DialogContent>
       </Dialog>
 
@@ -869,7 +1190,8 @@ export function ScheduleComparison({ project, scheduleItems, onScheduleUpdate }:
 
             {fileParseError && (
               <Alert variant="destructive">
-                <AlertDescription>{fileParseError}</AlertDescription>
+                <AlertCircle className="h-4 w-4" />
+                <AlertDescription className="ml-2">{fileParseError}</AlertDescription>
               </Alert>
             )}
 
