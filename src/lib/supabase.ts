@@ -17,6 +17,6 @@ if (!supabaseKey) {
 }
 
 // Create and export the Supabase client
-const supabase = createClient(supabaseUrl, supabaseKey);
+export const supabase = createClient(supabaseUrl, supabaseKey);
 
-export { supabase };
+export { supabase as default };
