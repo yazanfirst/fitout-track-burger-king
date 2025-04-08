@@ -27,8 +27,14 @@ const Index = () => {
   // Initialize the database with mock data if empty
   useEffect(() => {
     const initialize = async () => {
-      await initializeDatabase({ projects, schedules, orders, responsibilities });
-      await fetchProjects();
+      try {
+        await initializeDatabase({ projects, schedules, orders, responsibilities });
+        await fetchProjects();
+      } catch (error) {
+        console.error("Error during initialization:", error);
+        // Even if initialization fails, try to fetch projects
+        await fetchProjects();
+      }
     };
     
     initialize();
@@ -39,6 +45,7 @@ const Index = () => {
     setIsLoading(true);
     try {
       const data = await getProjects();
+      console.log("Projects fetched:", data);
       setProjectsList(data);
       
       if (data.length > 0) {
@@ -49,9 +56,18 @@ const Index = () => {
       console.error("Error fetching projects:", error);
       toast({
         title: "Error",
-        description: "Failed to load projects.",
+        description: "Failed to load projects. Using mock data instead.",
         variant: "destructive",
       });
+      
+      // Use mock data as fallback
+      setProjectsList(projects);
+      if (projects.length > 0) {
+        setSelectedProject(projects[0]);
+        setScheduleItems(schedules.filter(item => item.projectId === projects[0].id));
+        setOrderItems(orders.filter(item => item.projectId === projects[0].id));
+        setResponsibilityItems(responsibilities.filter(item => item.projectId === projects[0].id));
+      }
     } finally {
       setIsLoading(false);
     }
@@ -77,7 +93,7 @@ const Index = () => {
       console.error("Error fetching project data:", error);
       toast({
         title: "Error",
-        description: "Failed to load project data.",
+        description: "Failed to load project data. Using mock data instead.",
         variant: "destructive",
       });
     } finally {
