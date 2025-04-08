@@ -11,7 +11,7 @@ import { DatePicker } from "@/components/ui/date-picker";
 import { PlusCircle, Upload, FileText, Calendar, CalendarX, X, TrashIcon } from "lucide-react";
 import { Project, ScheduleItem } from "@/data/mockData";
 import { format, differenceInCalendarDays } from "date-fns";
-import { createScheduleItem, updateScheduleItem, deleteScheduleItem, parseScheduleFile } from "@/lib/api";
+import { createScheduleItem, updateScheduleItem, deleteScheduleItem, parseScheduleFile, ensureStorageBucketsExist } from "@/lib/api";
 import { useToast } from "@/hooks/use-toast";
 import { Bar, BarChart, ResponsiveContainer, XAxis, YAxis } from "recharts";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -49,6 +49,15 @@ export function ScheduleComparison({ project, scheduleItems, onScheduleUpdate }:
   const [importSuccessful, setImportSuccessful] = useState(false);
   const [pdfUrl, setPdfUrl] = useState<string | null>(null);
   const [showPdfViewer, setShowPdfViewer] = useState(false);
+  
+  // Ensure storage buckets exist on component load
+  useEffect(() => {
+    ensureStorageBucketsExist().then(success => {
+      if (!success) {
+        console.warn("Failed to ensure storage buckets exist");
+      }
+    });
+  }, []);
 
   // Reset new item form when project changes
   useEffect(() => {
@@ -118,32 +127,65 @@ export function ScheduleComparison({ project, scheduleItems, onScheduleUpdate }:
     setUploadLoading(true);
     
     try {
-      // Upload PDF to Supabase storage
-      const fileName = `${project.id}/schedules/pdf_${Date.now()}_${file.name}`;
-      const { data, error } = await supabase
+      // Ensure storage buckets exist first
+      await ensureStorageBucketsExist();
+      
+      // Upload PDF to Supabase storage (first try schedule-pdfs bucket)
+      const fileName = `${project.id}/pdf_${Date.now()}_${file.name}`;
+      let { data, error } = await supabase
         .storage
-        .from('project_files')
+        .from('schedule-pdfs')
         .upload(fileName, file, {
           upsert: true,
           contentType: 'application/pdf'
         });
-        
+      
+      // If schedule-pdfs bucket fails, try project_files bucket
       if (error) {
-        throw new Error(`Error uploading PDF: ${error.message}`);
-      }
-      
-      // Get public URL
-      const { data: urlData } = supabase
-        .storage
-        .from('project_files')
-        .getPublicUrl(fileName);
-      
-      if (!urlData?.publicUrl) {
-        throw new Error("Couldn't get public URL for uploaded PDF");
+        console.error("Error uploading to schedule-pdfs bucket:", error);
+        const alternativeFileName = `${project.id}/schedules/pdf_${Date.now()}_${file.name}`;
+        const result = await supabase
+          .storage
+          .from('project_files')
+          .upload(alternativeFileName, file, {
+            upsert: true,
+            contentType: 'application/pdf'
+          });
+        
+        data = result.data;
+        error = result.error;
+        
+        if (error) {
+          throw new Error(`Error uploading PDF: ${error.message}`);
+        }
+        
+        // Get public URL from project_files bucket
+        const { data: urlData } = supabase
+          .storage
+          .from('project_files')
+          .getPublicUrl(alternativeFileName);
+        
+        if (!urlData?.publicUrl) {
+          throw new Error("Couldn't get public URL for uploaded PDF");
+        }
+        
+        setPdfUrl(urlData.publicUrl);
+      } else {
+        // Get public URL from schedule-pdfs bucket
+        const { data: urlData } = supabase
+          .storage
+          .from('schedule-pdfs')
+          .getPublicUrl(fileName);
+        
+        if (!urlData?.publicUrl) {
+          throw new Error("Couldn't get public URL for uploaded PDF");
+        }
+        
+        setPdfUrl(urlData.publicUrl);
       }
       
       // Save metadata to schedules table
-      await supabase
+      const { error: insertError } = await supabase
         .from('schedules')
         .insert({
           project_id: project.id,
@@ -152,13 +194,16 @@ export function ScheduleComparison({ project, scheduleItems, onScheduleUpdate }:
           status: 'pending',
           start_date: new Date().toISOString(),
           end_date: new Date().toISOString(),
-          file_url: urlData.publicUrl,
+          file_url: pdfUrl,
           file_name: file.name,
           uploaded_at: new Date().toISOString()
         });
       
-      // Set PDF URL and show PDF viewer
-      setPdfUrl(urlData.publicUrl);
+      if (insertError) {
+        console.error("Error saving PDF metadata:", insertError);
+      }
+      
+      // Show PDF viewer
       setShowPdfViewer(true);
       setImportSuccessful(true);
       
@@ -186,6 +231,9 @@ export function ScheduleComparison({ project, scheduleItems, onScheduleUpdate }:
     setShowPdfViewer(false);
 
     try {
+      // Ensure storage buckets exist first
+      await ensureStorageBucketsExist();
+      
       // Upload and parse file
       const result = await parseScheduleFile(project.id, fileToUpload);
       

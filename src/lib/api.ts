@@ -1,6 +1,59 @@
+
 import { supabase } from '@/integrations/supabase/client';
 import { Project, ScheduleItem, OrderItem, ResponsibilityItem } from '@/data/mockData';
 import { Database } from '@/integrations/supabase/types';
+
+// Ensure storage buckets exist
+export const ensureStorageBucketsExist = async () => {
+  try {
+    // Check if project_files bucket exists
+    const { data: projectFilesBucket, error: projectFilesError } = await supabase
+      .storage
+      .getBucket('project_files');
+    
+    // Create project_files bucket if it doesn't exist
+    if (projectFilesError && projectFilesError.message.includes('not found')) {
+      const { data, error } = await supabase
+        .storage
+        .createBucket('project_files', {
+          public: true, // Make bucket publicly accessible
+          fileSizeLimit: 50 * 1024 * 1024, // 50MB limit per file
+        });
+      
+      if (error) {
+        console.error('Error creating project_files bucket:', error);
+      } else {
+        console.log('Created project_files bucket successfully');
+      }
+    }
+    
+    // Check if schedule-pdfs bucket exists
+    const { data: schedulePdfsBucket, error: schedulePdfsError } = await supabase
+      .storage
+      .getBucket('schedule-pdfs');
+    
+    // Create schedule-pdfs bucket if it doesn't exist
+    if (schedulePdfsError && schedulePdfsError.message.includes('not found')) {
+      const { data, error } = await supabase
+        .storage
+        .createBucket('schedule-pdfs', {
+          public: true, // Make bucket publicly accessible
+          fileSizeLimit: 50 * 1024 * 1024, // 50MB limit per file
+        });
+      
+      if (error) {
+        console.error('Error creating schedule-pdfs bucket:', error);
+      } else {
+        console.log('Created schedule-pdfs bucket successfully');
+      }
+    }
+    
+    return true;
+  } catch (error) {
+    console.error('Error ensuring storage buckets exist:', error);
+    return false;
+  }
+};
 
 // Get all projects
 export const getProjects = async () => {
@@ -443,6 +496,9 @@ export const deleteProject = async (projectId: string) => {
 // Upload file to storage
 export const uploadFile = async (file: File, projectId: string, type: 'drawing' | 'photo') => {
   try {
+    // Ensure storage buckets exist
+    await ensureStorageBucketsExist();
+    
     const fileExt = file.name.split('.').pop()?.toLowerCase();
     const fileName = `${projectId}/${type}_${Date.now()}.${fileExt}`;
     
@@ -501,6 +557,9 @@ export const initializeDatabase = async (mockData: {
   responsibilities: any[];
 }) => {
   try {
+    // Ensure storage buckets exist during initialization
+    await ensureStorageBucketsExist();
+    
     console.info('Initializing database with mock data...');
     
     if (mockData.projects && mockData.projects.length > 0) {
@@ -612,17 +671,44 @@ export const initializeDatabase = async (mockData: {
 // Upload and parse schedule file
 export const uploadScheduleFile = async (projectId: string, file: File) => {
   try {
+    // Ensure storage buckets exist
+    await ensureStorageBucketsExist();
+    
+    // Try uploading to project_files first
     const fileExt = file.name.split('.').pop()?.toLowerCase();
     const fileName = `${projectId}/schedules/schedule_${Date.now()}.${fileExt}`;
     
     const { data, error } = await supabase
       .storage
       .from('project_files')
-      .upload(fileName, file);
+      .upload(fileName, file, {
+        upsert: true // Add upsert option to overwrite if same name exists
+      });
       
     if (error) {
-      console.error('Error uploading schedule file:', error);
-      return null;
+      console.error('Error uploading schedule file to project_files:', error);
+      
+      // Try uploading to schedule-pdfs if project_files fails
+      const pdfFileName = `${projectId}/schedule_${Date.now()}.${fileExt}`;
+      
+      const { data: pdfData, error: pdfError } = await supabase
+        .storage
+        .from('schedule-pdfs')
+        .upload(pdfFileName, file, {
+          upsert: true
+        });
+        
+      if (pdfError) {
+        console.error('Error uploading schedule file to schedule-pdfs:', pdfError);
+        return null;
+      }
+      
+      const { data: pdfUrlData } = supabase
+        .storage
+        .from('schedule-pdfs')
+        .getPublicUrl(pdfFileName);
+        
+      return pdfUrlData?.publicUrl;
     }
     
     const { data: urlData } = supabase
