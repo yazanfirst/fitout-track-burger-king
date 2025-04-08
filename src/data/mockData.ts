@@ -1,12 +1,18 @@
-export interface Project {
+import { Tables } from "@/integrations/supabase/types";
+
+export type Project = {
   id: string;
   name: string;
   location: string;
+  client: string;
+  startDate: string;
+  endDate: string;
+  budget: number;
   contractorProgress: number;
   ownerProgress: number;
-  notes: string;
   brand: 'BK' | 'TC';
-  status: {
+  notes?: string;
+  status?: string | {
     orders: number;
     ordersTotal: number;
     lpos: number;
@@ -16,181 +22,351 @@ export interface Project {
     invoices: number;
     invoicesTotal: number;
   };
-}
+};
 
-export interface ScheduleItem {
-  id?: string;
-  projectId?: string;
+export type ScheduleItem = {
+  id: string;
+  projectId: string;
   task: string;
+  description?: string;
+  status?: string;
   plannedStart: string;
   plannedEnd: string;
-  actualStart: string | null;
-  actualEnd: string | null;
+  actualStart?: string;
+  actualEnd?: string;
   delayDays: number;
-}
+};
 
-export interface SitePhoto {
-  id: string;
-  projectId: string;
-  url: string;
-  uploadDate: string;
-  description: string;
-}
-
-export interface Drawing {
+export type OrderItem = {
   id: string;
   projectId: string;
   name: string;
-  url: string;
-  uploadDate: string;
-}
+  quantity: number;
+  orderDate: string;
+  expectedDelivery: string;
+  actualDelivery?: string;
+  status: string;
+  notes?: string;
+};
 
-export interface OrderItem {
-  id: string;
-  projectId: string;
-  category: string;
-  name: string;
-  ordered: boolean;
-  lpoReceived: boolean;
-  lpoFile?: string;
-  invoiceStatus: '0%' | '25%' | '50%' | '100%';
-  invoiceFile?: string;
-}
-
-export interface ResponsibilityItem {
+export type ResponsibilityItem = {
   id: string;
   projectId: string;
   task: string;
-  responsibleParty: 'Contractor' | 'Owner';
-  notes: string;
-}
+  assignedTo: string;
+  dueDate?: string;
+  status?: string;
+  notes?: string;
+};
 
-// Mock projects
 export const projects: Project[] = [
   {
-    id: '1',
-    name: 'Warsan Mall',
-    location: 'Dubai, UAE',
-    contractorProgress: 65,
-    ownerProgress: 80,
-    notes: 'Civil works complete. Awaiting MEP installation.',
-    brand: 'BK',
+    id: "p-1",
+    name: "BK Fort Greene",
+    location: "Brooklyn, NY",
+    client: "Brooklyn Kawi",
+    startDate: "2023-01-01",
+    endDate: "2023-12-31",
+    budget: 500000,
+    contractorProgress: 75,
+    ownerProgress: 60,
+    brand: "BK",
     status: {
-      orders: 18,
-      ordersTotal: 25,
-      lpos: 15,
-      lposTotal: 25,
+      orders: 5,
+      ordersTotal: 10,
+      lpos: 3,
+      lposTotal: 5,
       drawings: 8,
       drawingsTotal: 10,
-      invoices: 12,
-      invoicesTotal: 25
-    }
+      invoices: 2,
+      invoicesTotal: 3,
+    },
   },
   {
-    id: '2',
-    name: 'Sairina Mall',
-    location: 'Abu Dhabi, UAE',
+    id: "p-2",
+    name: "TC Flatbush",
+    location: "Brooklyn, NY",
+    client: "TC USA",
+    startDate: "2023-02-15",
+    endDate: "2024-01-31",
+    budget: 750000,
     contractorProgress: 40,
-    ownerProgress: 35,
-    notes: 'Foundation work in progress. Equipment orders placed.',
-    brand: 'BK',
+    ownerProgress: 30,
+    brand: "TC",
     status: {
-      orders: 10,
-      ordersTotal: 25,
-      lpos: 8,
-      lposTotal: 25,
+      orders: 2,
+      ordersTotal: 8,
+      lpos: 1,
+      lposTotal: 4,
       drawings: 5,
-      drawingsTotal: 10,
-      invoices: 6,
-      invoicesTotal: 25
-    }
+      drawingsTotal: 9,
+      invoices: 1,
+      invoicesTotal: 2,
+    },
   },
   {
-    id: '3',
-    name: 'City Center',
-    location: 'Sharjah, UAE',
-    contractorProgress: 85,
-    ownerProgress: 70,
-    notes: 'Final finishing and equipment installation underway.',
-    brand: 'TC',
+    id: "p-3",
+    name: "BK Harlem",
+    location: "New York, NY",
+    client: "Brooklyn Kawi",
+    startDate: "2023-03-01",
+    endDate: "2023-11-30",
+    budget: 600000,
+    contractorProgress: 90,
+    ownerProgress: 85,
+    brand: "BK",
     status: {
-      orders: 22,
-      ordersTotal: 25,
-      lpos: 21,
-      lposTotal: 25,
-      drawings: 10,
+      orders: 7,
+      ordersTotal: 10,
+      lpos: 4,
+      lposTotal: 5,
+      drawings: 9,
       drawingsTotal: 10,
-      invoices: 20,
-      invoicesTotal: 25
-    }
-  }
+      invoices: 3,
+      invoicesTotal: 3,
+    },
+  },
+  {
+    id: "p-4",
+    name: "TC Bronx",
+    location: "Bronx, NY",
+    client: "TC USA",
+    startDate: "2023-04-10",
+    endDate: "2024-02-29",
+    budget: 800000,
+    contractorProgress: 25,
+    ownerProgress: 20,
+    brand: "TC",
+    status: {
+      orders: 1,
+      ordersTotal: 7,
+      lpos: 0,
+      lposTotal: 3,
+      drawings: 3,
+      drawingsTotal: 8,
+      invoices: 0,
+      invoicesTotal: 1,
+    },
+  },
 ];
 
-// Mock schedule items
-export const schedules: { [key: string]: ScheduleItem[] } = {
-  '1': [
-    { task: 'Site Preparation', plannedStart: '2023-01-10', plannedEnd: '2023-01-20', actualStart: '2023-01-12', actualEnd: '2023-01-22', delayDays: 2 },
-    { task: 'Foundation Work', plannedStart: '2023-01-21', plannedEnd: '2023-02-10', actualStart: '2023-01-23', actualEnd: '2023-02-15', delayDays: 5 },
-    { task: 'Framing', plannedStart: '2023-02-11', plannedEnd: '2023-03-05', actualStart: '2023-02-16', actualEnd: '2023-03-12', delayDays: 7 },
-    { task: 'MEP Installation', plannedStart: '2023-03-06', plannedEnd: '2023-04-05', actualStart: '2023-03-13', actualEnd: null, delayDays: 7 }
+export const schedules: { [projectId: string]: ScheduleItem[] } = {
+  "p-1": [
+    {
+      id: "s-1",
+      projectId: "p-1",
+      task: "Initial Planning",
+      plannedStart: "2023-01-01",
+      plannedEnd: "2023-01-15",
+      actualStart: "2023-01-01",
+      actualEnd: "2023-01-14",
+      delayDays: 0,
+    },
+    {
+      id: "s-2",
+      projectId: "p-1",
+      task: "Site Survey",
+      plannedStart: "2023-01-16",
+      plannedEnd: "2023-01-31",
+      actualStart: "2023-01-16",
+      actualEnd: "2023-01-30",
+      delayDays: 0,
+    },
+    {
+      id: "s-3",
+      projectId: "p-1",
+      task: "Foundation Work",
+      plannedStart: "2023-02-01",
+      plannedEnd: "2023-02-28",
+      actualStart: "2023-02-01",
+      actualEnd: "2023-03-10",
+      delayDays: 10,
+    },
   ],
-  '2': [
-    { task: 'Site Preparation', plannedStart: '2023-03-01', plannedEnd: '2023-03-10', actualStart: '2023-03-05', actualEnd: '2023-03-15', delayDays: 5 },
-    { task: 'Foundation Work', plannedStart: '2023-03-11', plannedEnd: '2023-03-25', actualStart: '2023-03-16', actualEnd: null, delayDays: 5 }
+  "p-2": [
+    {
+      id: "s-4",
+      projectId: "p-2",
+      task: "Initial Planning",
+      plannedStart: "2023-02-15",
+      plannedEnd: "2023-02-28",
+      actualStart: "2023-02-15",
+      actualEnd: "2023-02-27",
+      delayDays: 0,
+    },
+    {
+      id: "s-5",
+      projectId: "p-2",
+      task: "Permitting",
+      plannedStart: "2023-03-01",
+      plannedEnd: "2023-03-31",
+      actualStart: null,
+      actualEnd: null,
+      delayDays: 0,
+    },
   ],
-  '3': [
-    { task: 'Site Preparation', plannedStart: '2023-02-01', plannedEnd: '2023-02-10', actualStart: '2023-02-01', actualEnd: '2023-02-09', delayDays: 0 },
-    { task: 'Foundation Work', plannedStart: '2023-02-11', plannedEnd: '2023-02-28', actualStart: '2023-02-10', actualEnd: '2023-02-25', delayDays: 0 },
-    { task: 'Framing', plannedStart: '2023-03-01', plannedEnd: '2023-03-20', actualStart: '2023-02-26', actualEnd: '2023-03-18', delayDays: 0 },
-    { task: 'MEP Installation', plannedStart: '2023-03-21', plannedEnd: '2023-04-10', actualStart: '2023-03-19', actualEnd: '2023-04-12', delayDays: 2 },
-    { task: 'Interior Finishing', plannedStart: '2023-04-11', plannedEnd: '2023-05-01', actualStart: '2023-04-13', actualEnd: null, delayDays: 2 }
-  ]
+  "p-3": [
+    {
+      id: "s-6",
+      projectId: "p-3",
+      task: "Demolition",
+      plannedStart: "2023-03-01",
+      plannedEnd: "2023-03-15",
+      actualStart: "2023-03-01",
+      actualEnd: "2023-03-14",
+      delayDays: 0,
+    },
+    {
+      id: "s-7",
+      projectId: "p-3",
+      task: "Construction",
+      plannedStart: "2023-03-16",
+      plannedEnd: "2023-10-31",
+      actualStart: "2023-03-16",
+      actualEnd: "2023-10-30",
+      delayDays: 0,
+    },
+  ],
+  "p-4": [
+    {
+      id: "s-8",
+      projectId: "p-4",
+      task: "Planning",
+      plannedStart: "2023-04-10",
+      plannedEnd: "2023-04-30",
+      actualStart: "2023-04-10",
+      actualEnd: "2023-04-29",
+      delayDays: 0,
+    },
+    {
+      id: "s-9",
+      projectId: "p-4",
+      task: "Design",
+      plannedStart: "2023-05-01",
+      plannedEnd: "2023-06-30",
+      actualStart: null,
+      actualEnd: null,
+      delayDays: 0,
+    },
+  ],
 };
 
-// Mock responsibility items
-export const responsibilities: { [key: string]: ResponsibilityItem[] } = {
-  '1': [
-    { id: '1-1', projectId: '1', task: 'Civil Works', responsibleParty: 'Contractor', notes: 'Complete' },
-    { id: '1-2', projectId: '1', task: 'Plumbing', responsibleParty: 'Contractor', notes: 'In progress' },
-    { id: '1-3', projectId: '1', task: 'Electrical', responsibleParty: 'Contractor', notes: 'Waiting for permits' },
-    { id: '1-4', projectId: '1', task: 'Equipment Installation', responsibleParty: 'Owner', notes: 'Scheduled for next month' },
-    { id: '1-5', projectId: '1', task: 'Furniture', responsibleParty: 'Owner', notes: 'Ordered' }
+export const orders: { [projectId: string]: OrderItem[] } = {
+  "p-1": [
+    {
+      id: "o-1",
+      projectId: "p-1",
+      name: "Steel Beams",
+      quantity: 10,
+      orderDate: "2023-02-01",
+      expectedDelivery: "2023-02-15",
+      actualDelivery: "2023-02-14",
+      status: "delivered",
+      notes: "High quality steel beams for foundation.",
+    },
+    {
+      id: "o-2",
+      projectId: "p-1",
+      name: "Concrete Mix",
+      quantity: 50,
+      orderDate: "2023-02-01",
+      expectedDelivery: "2023-02-10",
+      actualDelivery: "2023-02-09",
+      status: "delivered",
+      notes: "Ready-mix concrete for foundation.",
+    },
   ],
-  '2': [
-    { id: '2-1', projectId: '2', task: 'Civil Works', responsibleParty: 'Contractor', notes: 'In progress' },
-    { id: '2-2', projectId: '2', task: 'Plumbing', responsibleParty: 'Contractor', notes: 'Not started' },
-    { id: '2-3', projectId: '2', task: 'Equipment Installation', responsibleParty: 'Owner', notes: 'Equipment ordered' }
+  "p-2": [
+    {
+      id: "o-3",
+      projectId: "p-2",
+      name: "Lumber",
+      quantity: 2000,
+      orderDate: "2023-03-01",
+      expectedDelivery: "2023-03-15",
+      status: "pending",
+      notes: "Various sizes of lumber for framing.",
+    },
   ],
-  '3': [
-    { id: '3-1', projectId: '3', task: 'Civil Works', responsibleParty: 'Contractor', notes: 'Complete' },
-    { id: '3-2', projectId: '3', task: 'Plumbing', responsibleParty: 'Contractor', notes: 'Complete' },
-    { id: '3-3', projectId: '3', task: 'Electrical', responsibleParty: 'Contractor', notes: 'Complete' },
-    { id: '3-4', projectId: '3', task: 'Equipment Installation', responsibleParty: 'Owner', notes: 'In progress' },
-    { id: '3-5', projectId: '3', task: 'Furniture', responsibleParty: 'Owner', notes: 'Delivered' },
-    { id: '3-6', projectId: '3', task: 'Signage', responsibleParty: 'Owner', notes: 'Installation scheduled' }
-  ]
+  "p-3": [
+    {
+      id: "o-4",
+      projectId: "p-3",
+      name: "Bricks",
+      quantity: 10000,
+      orderDate: "2023-03-15",
+      expectedDelivery: "2023-03-31",
+      actualDelivery: "2023-03-30",
+      status: "delivered",
+      notes: "Standard size bricks for construction.",
+    },
+  ],
+  "p-4": [
+    {
+      id: "o-5",
+      projectId: "p-4",
+      name: "Design Software License",
+      quantity: 5,
+      orderDate: "2023-04-15",
+      expectedDelivery: "2023-04-22",
+      status: "pending",
+      notes: "Annual licenses for architectural design software.",
+    },
+  ],
 };
 
-// Mock orders
-export const orders: { [key: string]: OrderItem[] } = {
-  '1': [
-    { id: '1-1', projectId: '1', category: 'Furniture', name: 'Dining Tables', ordered: true, lpoReceived: true, invoiceStatus: '50%' },
-    { id: '1-2', projectId: '1', category: 'Furniture', name: 'Chairs', ordered: true, lpoReceived: true, invoiceStatus: '50%' },
-    { id: '1-3', projectId: '1', category: 'Equipment', name: 'Fryers', ordered: true, lpoReceived: true, invoiceStatus: '100%' },
-    { id: '1-4', projectId: '1', category: 'Equipment', name: 'Grills', ordered: true, lpoReceived: false, invoiceStatus: '0%' },
-    { id: '1-5', projectId: '1', category: 'S/S', name: 'Kitchen Counters', ordered: true, lpoReceived: true, invoiceStatus: '25%' },
-    { id: '1-6', projectId: '1', category: 'Cold Room', name: 'Walk-in Freezer', ordered: false, lpoReceived: false, invoiceStatus: '0%' }
+export const responsibilities: { [projectId: string]: ResponsibilityItem[] } = {
+  "p-1": [
+    {
+      id: "r-1",
+      projectId: "p-1",
+      task: "Foundation Inspection",
+      assignedTo: "John Doe",
+      dueDate: "2023-02-28",
+      status: "completed",
+      notes: "Ensure foundation meets safety standards.",
+    },
+    {
+      id: "r-2",
+      projectId: "p-1",
+      task: "Electrical Wiring",
+      assignedTo: "Jane Smith",
+      dueDate: "2023-03-15",
+      status: "in progress",
+      notes: "Install electrical wiring and outlets.",
+    },
   ],
-  '2': [
-    { id: '2-1', projectId: '2', category: 'Furniture', name: 'Dining Tables', ordered: true, lpoReceived: true, invoiceStatus: '25%' },
-    { id: '2-2', projectId: '2', category: 'Furniture', name: 'Chairs', ordered: true, lpoReceived: false, invoiceStatus: '0%' },
-    { id: '2-3', projectId: '2', category: 'Equipment', name: 'Fryers', ordered: false, lpoReceived: false, invoiceStatus: '0%' }
+  "p-2": [
+    {
+      id: "r-3",
+      projectId: "p-2",
+      task: "Framing Inspection",
+      assignedTo: "John Doe",
+      dueDate: "2023-04-15",
+      status: "pending",
+      notes: "Inspect framing for structural integrity.",
+    },
   ],
-  '3': [
-    { id: '3-1', projectId: '3', category: 'Furniture', name: 'Dining Tables', ordered: true, lpoReceived: true, invoiceStatus: '100%' },
-    { id: '3-2', projectId: '3', category: 'Furniture', name: 'Chairs', ordered: true, lpoReceived: true, invoiceStatus: '100%' },
-    { id: '3-3', projectId: '3', category: 'Equipment', name: 'Fryers', ordered: true, lpoReceived: true, invoiceStatus: '100%' },
-    { id: '3-4', projectId: '3', category: 'Equipment', name: 'Grills', ordered: true, lpoReceived: true, invoiceStatus: '50%' },
-    { id: '3-5', projectId: '3', category: 'S/S', name: 'Kitchen Counters', ordered: true, lpoReceived: true, invoiceStatus: '100%' }
-  ]
+  "p-3": [
+    {
+      id: "r-4",
+      projectId: "p-3",
+      task: "Brick Laying",
+      assignedTo: "Construction Crew",
+      dueDate: "2023-04-30",
+      status: "completed",
+      notes: "Lay bricks for exterior walls.",
+    },
+  ],
+  "p-4": [
+    {
+      id: "r-5",
+      projectId: "p-4",
+      task: "Software Installation",
+      assignedTo: "IT Department",
+      dueDate: "2023-05-01",
+      status: "pending",
+      notes: "Install design software on workstations.",
+    },
+  ],
 };
