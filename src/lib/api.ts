@@ -1,6 +1,7 @@
 
 import { supabase } from '@/integrations/supabase/client';
 import { Project, ScheduleItem, OrderItem, ResponsibilityItem } from '@/data/mockData';
+import { Database } from '@/integrations/supabase/types';
 
 // Get all projects
 export const getProjects = async () => {
@@ -26,11 +27,10 @@ export const getProjects = async () => {
       startDate: project.start_date,
       endDate: project.end_date,
       budget: project.budget || 0,
-      status: project.status || "planning",
       contractorProgress: 0, // Default values since not in DB
       ownerProgress: 0,      // Default values since not in DB
       brand: 'BK' as 'BK' | 'TC', // Default value
-      // Add a default status object to match the expected Project type
+      // Add project status object
       status: {
         orders: 0,
         ordersTotal: 10,
@@ -167,9 +167,13 @@ export const updateProject = async (projectId: string, updates: Partial<Project>
     if ('client' in updates) dbUpdates.client = updates.client;
     if ('notes' in updates) dbUpdates.notes = updates.notes;
     if ('budget' in updates) dbUpdates.budget = updates.budget;
-    if ('status' in updates && typeof updates.status === 'string') dbUpdates.status = updates.status;
     if ('startDate' in updates) dbUpdates.start_date = updates.startDate;
     if ('endDate' in updates) dbUpdates.end_date = updates.endDate;
+    
+    // Only use string status, not the complex status object
+    if ('status' in updates && typeof updates.status === 'string') {
+      dbUpdates.status = updates.status;
+    }
     
     const { data, error } = await supabase
       .from('projects')
@@ -201,11 +205,9 @@ export const updateProject = async (projectId: string, updates: Partial<Project>
       startDate: data.start_date,
       endDate: data.end_date,
       budget: data.budget || 0,
-      status: data.status || "planning",
       contractorProgress: 0, // Default values 
       ownerProgress: 0,      // Default values
       brand: 'BK' as 'BK' | 'TC', // Default value
-      // Add a default status object
       status: {
         orders: 0,
         ordersTotal: 10,
@@ -229,11 +231,11 @@ export const createProject = async (projectData: Omit<Project, 'id'>) => {
     // Convert from Project structure to database structure
     const dbProject = {
       name: projectData.name,
-      location: projectData.location,
+      location: projectData.location || '',
       client: projectData.client || '',
       notes: projectData.notes || '',
       budget: projectData.budget || 0,
-      status: projectData.status || 'planning',
+      status: typeof projectData.status === 'string' ? projectData.status : 'planning',
       start_date: projectData.startDate || new Date().toISOString(),
       end_date: projectData.endDate || new Date(new Date().setMonth(new Date().getMonth() + 3)).toISOString()
     };
@@ -264,11 +266,9 @@ export const createProject = async (projectData: Omit<Project, 'id'>) => {
       startDate: data.start_date,
       endDate: data.end_date,
       budget: data.budget || 0,
-      status: data.status || "planning",
       contractorProgress: 0, // Default values 
       ownerProgress: 0,      // Default values
       brand: projectData.brand || ('BK' as 'BK' | 'TC'), // Use provided brand or default
-      // Add a default status object
       status: {
         orders: 0,
         ordersTotal: 10,
@@ -496,23 +496,23 @@ export const initializeDatabase = async (mockData: {
         client: p.client || null,
         notes: p.notes || null,
         budget: p.budget || null,
-        status: p.status || 'planning',
+        status: typeof p.status === 'string' ? p.status : 'planning',
         start_date: p.startDate || new Date().toISOString(),
         end_date: p.endDate || new Date(new Date().setMonth(new Date().getMonth() + 3)).toISOString()
       }));
       
-      // Insert projects
-      const { error: projectsError, data: insertedProjects } = await supabase
-        .from('projects')
-        .insert(dbProjects)
-        .select();
-        
-      if (projectsError) {
-        console.error('Error inserting mock projects:', projectsError);
-        return { success: false, error: projectsError };
+      // Insert projects one by one to avoid array type issues
+      for (const project of dbProjects) {
+        const { error } = await supabase
+          .from('projects')
+          .insert(project);
+          
+        if (error) {
+          console.error('Error inserting project:', error);
+        }
       }
       
-      console.log('Successfully initialized projects:', insertedProjects);
+      console.log('Successfully initialized projects');
       
       // Could add additional initializations for schedules, orders, etc. here
     }
