@@ -228,7 +228,7 @@ export const updateProject = async (projectId: string, updates: Partial<Project>
 // Create a new project
 export const createProject = async (projectData: Omit<Project, 'id'>) => {
   try {
-    // Convert from Project structure to database structure
+    // Type-safe access to properties using type casting if necessary
     const dbProject = {
       name: projectData.name,
       location: projectData.location || '',
@@ -289,14 +289,17 @@ export const createProject = async (projectData: Omit<Project, 'id'>) => {
 // Create a schedule item
 export const createScheduleItem = async (itemData: Omit<ScheduleItem, 'id'>) => {
   try {
+    // Extract properties safely, handling undefined cases
+    const { task, plannedStart, plannedEnd, projectId } = itemData;
+    
     // Convert from ScheduleItem structure to database structure
     const dbItem = {
-      project_id: itemData.projectId,
-      title: itemData.task,
-      start_date: itemData.plannedStart,
-      end_date: itemData.plannedEnd,
-      description: itemData.description || '',
-      status: itemData.status || 'pending'
+      project_id: projectId,
+      title: task,
+      start_date: plannedStart,
+      end_date: plannedEnd,
+      description: itemData.description || '',  // Safely access optional fields
+      status: itemData.status || 'pending'      // Safely access optional fields
     };
     
     const { data, error } = await supabase
