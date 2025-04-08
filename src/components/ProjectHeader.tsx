@@ -1,9 +1,10 @@
 
-import React from "react";
+import React, { useEffect } from "react";
 import { Project } from "@/data/mockData";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { PlusCircle, Trash2 } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
 
 interface ProjectHeaderProps {
   selectedProject: Project;
@@ -20,6 +21,25 @@ export function ProjectHeader({
   onCreateNew,
   onDeleteProject
 }: ProjectHeaderProps) {
+  const { toast } = useToast();
+  
+  // Debugging: log when the component renders with a new selected project
+  useEffect(() => {
+    console.log("ProjectHeader rendering with project:", selectedProject?.id);
+  }, [selectedProject]);
+  
+  const handleProjectChange = (value: string) => {
+    console.log("Project selection changed to:", value);
+    const selected = projects.find((p) => p.id === value);
+    if (selected) {
+      console.log("Selected project found:", selected.name);
+      onProjectChange(selected);
+      toast({
+        title: "Project Changed",
+        description: `Switched to ${selected.name}`,
+      });
+    }
+  };
   
   return (
     <div className="bg-background border-b sticky top-0 z-10">
@@ -28,14 +48,7 @@ export function ProjectHeader({
           <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4">
             <Select
               value={selectedProject?.id}
-              onValueChange={(value) => {
-                console.log("Project selection changed to:", value);
-                const selected = projects.find((p) => p.id === value);
-                if (selected) {
-                  console.log("Selected project:", selected);
-                  onProjectChange(selected);
-                }
-              }}
+              onValueChange={handleProjectChange}
             >
               <SelectTrigger className="w-full sm:w-[280px]">
                 <SelectValue placeholder="Select a project" />
@@ -50,8 +63,8 @@ export function ProjectHeader({
             </Select>
             <div className="flex items-center gap-2">
               <div className="flex flex-col">
-                <h1 className="text-xl font-semibold">{selectedProject.name}</h1>
-                <p className="text-sm text-muted-foreground">{selectedProject.location}</p>
+                <h1 className="text-xl font-semibold">{selectedProject?.name}</h1>
+                <p className="text-sm text-muted-foreground">{selectedProject?.location}</p>
               </div>
             </div>
           </div>

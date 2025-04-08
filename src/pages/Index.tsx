@@ -1,5 +1,6 @@
+
 import { useState, useEffect } from "react";
-import { useToast } from "@/components/ui/use-toast";
+import { useToast } from "@/hooks/use-toast";
 import { Sidebar } from "@/components/Sidebar";
 import { ProjectHeader } from "@/components/ProjectHeader";
 import { ProjectOverview } from "@/components/ProjectOverview";
@@ -92,17 +93,27 @@ const Index = () => {
     setIsLoading(true);
     
     try {
+      // Clear previous data first
+      setScheduleItems([]);
+      setOrderItems([]);
+      setResponsibilityItems([]);
+      
       const scheduleData = await getScheduleItems(projectId);
-      console.log("Schedule data fetched:", scheduleData);
+      console.log("Schedule data fetched for project", projectId, ":", scheduleData);
       setScheduleItems(scheduleData);
       
       const orderData = await getOrderItems(projectId);
-      console.log("Order data fetched:", orderData);
+      console.log("Order data fetched for project", projectId, ":", orderData);
       setOrderItems(orderData);
       
       const responsibilityData = await getResponsibilityItems(projectId);
-      console.log("Responsibility data fetched:", responsibilityData);
+      console.log("Responsibility data fetched for project", projectId, ":", responsibilityData);
       setResponsibilityItems(responsibilityData);
+      
+      toast({
+        title: "Data Loaded",
+        description: `Project data has been refreshed`,
+      });
     } catch (error) {
       console.error("Error fetching project data:", error);
       toast({
@@ -255,32 +266,43 @@ const Index = () => {
             />
             
             <main className="container mx-auto px-4 py-6 md:px-6 pb-20">
-              <ProjectOverview 
-                project={selectedProject}
-                onNotesChange={handleNotesChange}
-              />
-              
-              <ScheduleComparison 
-                project={selectedProject}
-                scheduleItems={scheduleItems}
-                onScheduleUpdate={refreshScheduleData}
-              />
-              
-              <SitePhotos project={selectedProject} />
-              
-              <DrawingUpload project={selectedProject} />
-              
-              <OrderTracker 
-                project={selectedProject}
-                orders={orderItems}
-              />
-              
-              <ResponsibilityMatrix 
-                project={selectedProject}
-                responsibilities={responsibilityItems}
-              />
-              
-              <ReportGenerator project={selectedProject} />
+              {isLoading ? (
+                <div className="flex items-center justify-center py-16">
+                  <div className="text-center">
+                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-gray-900 mx-auto"></div>
+                    <p className="mt-4">Loading project data...</p>
+                  </div>
+                </div>
+              ) : (
+                <>
+                  <ProjectOverview 
+                    project={selectedProject}
+                    onNotesChange={handleNotesChange}
+                  />
+                  
+                  <ScheduleComparison 
+                    project={selectedProject}
+                    scheduleItems={scheduleItems}
+                    onScheduleUpdate={refreshScheduleData}
+                  />
+                  
+                  <SitePhotos project={selectedProject} />
+                  
+                  <DrawingUpload project={selectedProject} />
+                  
+                  <OrderTracker 
+                    project={selectedProject}
+                    orders={orderItems}
+                  />
+                  
+                  <ResponsibilityMatrix 
+                    project={selectedProject}
+                    responsibilities={responsibilityItems}
+                  />
+                  
+                  <ReportGenerator project={selectedProject} />
+                </>
+              )}
             </main>
           </>
         )}

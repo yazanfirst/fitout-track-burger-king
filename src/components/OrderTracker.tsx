@@ -1,5 +1,5 @@
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Check, FileText, Plus, Upload } from "lucide-react";
 import { Project, OrderItem } from "@/data/mockData";
 import { Button } from "@/components/ui/button";
@@ -30,7 +30,21 @@ interface OrderTrackerProps {
 export function OrderTracker({ project, orders }: OrderTrackerProps) {
   const [filterCategory, setFilterCategory] = useState<string>('all');
   
-  const categories = ['all', ...new Set(orders.map(order => order.category))];
+  // Debug orders
+  useEffect(() => {
+    console.log(`OrderTracker: Received ${orders?.length || 0} orders for project ${project?.id}`);
+  }, [orders, project]);
+  
+  // Ensure we have categories, even if empty
+  const categories = ['all'];
+  if (orders && orders.length > 0) {
+    const uniqueCategories = [...new Set(orders.map(order => order.category))];
+    uniqueCategories.forEach(category => {
+      if (category && !categories.includes(category)) {
+        categories.push(category);
+      }
+    });
+  }
   
   const filteredOrders = filterCategory === 'all' 
     ? orders 
@@ -58,7 +72,7 @@ export function OrderTracker({ project, orders }: OrderTrackerProps) {
       <Card className="card-shadow">
         <CardHeader className="pb-2">
           <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-            <CardTitle className="text-lg">Order Tracking</CardTitle>
+            <CardTitle className="text-lg">Order Tracking for {project.name}</CardTitle>
             
             <div className="flex flex-col sm:flex-row gap-3">
               <Select value={filterCategory} onValueChange={setFilterCategory}>
@@ -97,7 +111,7 @@ export function OrderTracker({ project, orders }: OrderTrackerProps) {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredOrders.length > 0 ? (
+                {filteredOrders && filteredOrders.length > 0 ? (
                   filteredOrders.map((order) => (
                     <TableRow key={order.id}>
                       <TableCell>
@@ -158,7 +172,7 @@ export function OrderTracker({ project, orders }: OrderTrackerProps) {
                 ) : (
                   <TableRow>
                     <TableCell colSpan={8} className="text-center py-10 text-muted-foreground">
-                      No orders found for the selected category.
+                      No orders found for this project.
                     </TableCell>
                   </TableRow>
                 )}
