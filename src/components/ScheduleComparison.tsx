@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -44,7 +43,7 @@ export function ScheduleComparison({ project, scheduleItems, onScheduleUpdate }:
   const [uploadLoading, setUploadLoading] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [fileParseError, setFileParseError] = useState<string | null>(null);
-  const [parsedItems, setParsedItems] = useState<Omit<ScheduleItem, 'id'>[]>([]);
+  const [parsedItems, setParsedItems] = useState<(Omit<ScheduleItem, 'id'> & { id?: string })[]>([]);
   const [importSuccessful, setImportSuccessful] = useState(false);
 
   // Reset new item form when project changes
@@ -125,7 +124,7 @@ export function ScheduleComparison({ project, scheduleItems, onScheduleUpdate }:
         });
         
         // Auto import items if they're already saved to DB
-        if (result.items.some(item => item.id)) {
+        if (result.items.some(item => 'id' in item && item.id)) {
           if (onScheduleUpdate) {
             onScheduleUpdate();
           }
