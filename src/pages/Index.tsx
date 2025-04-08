@@ -10,6 +10,7 @@ import { OrderTracker } from "@/components/OrderTracker";
 import { ResponsibilityMatrix } from "@/components/ResponsibilityMatrix";
 import { ReportGenerator } from "@/components/ReportGenerator";
 import { Project, projects, schedules, orders, responsibilities } from "@/data/mockData";
+import { TooltipProvider } from "@/components/ui/tooltip";
 
 const Index = () => {
   const [selectedProject, setSelectedProject] = useState<Project>(projects[0]);
