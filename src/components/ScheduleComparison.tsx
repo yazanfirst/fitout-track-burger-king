@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -11,7 +12,7 @@ import { PlusCircle, Upload, FileText, Calendar, CalendarX, X, TrashIcon } from 
 import { Project, ScheduleItem } from "@/data/mockData";
 import { format, differenceInCalendarDays, parse } from "date-fns";
 import { createScheduleItem, updateScheduleItem, deleteScheduleItem, uploadScheduleFile, parseScheduleFile } from "@/lib/api";
-import { useToast } from "@/components/ui/use-toast";
+import { useToast } from "@/hooks/use-toast";
 import { Bar, BarChart, ResponsiveContainer, XAxis, YAxis } from "recharts";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 
@@ -44,6 +45,7 @@ export function ScheduleComparison({ project, scheduleItems, onScheduleUpdate }:
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [fileParseError, setFileParseError] = useState<string | null>(null);
   const [parsedItems, setParsedItems] = useState<Omit<ScheduleItem, 'id'>[]>([]);
+  const [importSuccessful, setImportSuccessful] = useState(false);
 
   // Reset new item form when project changes
   useEffect(() => {
@@ -86,6 +88,7 @@ export function ScheduleComparison({ project, scheduleItems, onScheduleUpdate }:
     setSelectedFile(file);
     setFileParseError(null);
     setParsedItems([]);
+    setImportSuccessful(false);
     
     // Check file type
     const fileExt = file.name.split('.').pop()?.toLowerCase();
@@ -105,6 +108,7 @@ export function ScheduleComparison({ project, scheduleItems, onScheduleUpdate }:
     
     setUploadLoading(true);
     setFileParseError(null);
+    setImportSuccessful(false);
 
     try {
       // Upload and parse file
@@ -114,10 +118,23 @@ export function ScheduleComparison({ project, scheduleItems, onScheduleUpdate }:
         setFileParseError(result.error);
       } else if (result.items && result.items.length > 0) {
         setParsedItems(result.items);
+        setImportSuccessful(true);
         toast({
           title: "File Parsed Successfully",
           description: result.message || `${result.items.length} items found in the file.`
         });
+        
+        // Auto import items if they're already saved to DB
+        if (result.items.some(item => item.id)) {
+          if (onScheduleUpdate) {
+            onScheduleUpdate();
+          }
+          setIsUploadDialogOpen(false);
+          toast({
+            title: "Items Imported",
+            description: `${result.items.length} items have been imported into your schedule.`
+          });
+        }
       } else {
         setFileParseError("No valid schedule items found in the file.");
       }
@@ -340,7 +357,12 @@ export function ScheduleComparison({ project, scheduleItems, onScheduleUpdate }:
   // Format date for display
   const formatDate = (dateStr: string) => {
     if (!dateStr) return "-";
-    return format(new Date(dateStr), "MMM d, yyyy");
+    try {
+      return format(new Date(dateStr), "MMM d, yyyy");
+    } catch (error) {
+      console.error("Error formatting date:", dateStr, error);
+      return dateStr;
+    }
   };
 
   return (
@@ -392,7 +414,7 @@ export function ScheduleComparison({ project, scheduleItems, onScheduleUpdate }:
                     </TableRow>
                   ) : (
                     scheduleItems.map((item) => (
-                      <TableRow key={item.id}>
+                      <TableRow key={item.id} isStripe>
                         <TableCell className="font-medium">{item.task}</TableCell>
                         <TableCell className="hidden md:table-cell">{formatDate(item.plannedStart)}</TableCell>
                         <TableCell className="hidden md:table-cell">{formatDate(item.plannedEnd)}</TableCell>
@@ -698,6 +720,14 @@ export function ScheduleComparison({ project, scheduleItems, onScheduleUpdate }:
               </Alert>
             )}
 
+            {importSuccessful && (
+              <Alert className="bg-green-50 text-green-800 border-green-200">
+                <AlertDescription>
+                  File parsed successfully! {parsedItems.length} schedule items found.
+                </AlertDescription>
+              </Alert>
+            )}
+
             {parsedItems.length > 0 && (
               <div className="mt-4">
                 <h3 className="text-sm font-medium mb-2">Found {parsedItems.length} schedule items:</h3>
@@ -712,7 +742,7 @@ export function ScheduleComparison({ project, scheduleItems, onScheduleUpdate }:
                     </TableHeader>
                     <TableBody>
                       {parsedItems.map((item, index) => (
-                        <TableRow key={index}>
+                        <TableRow key={index} isStripe>
                           <TableCell>{item.task}</TableCell>
                           <TableCell>{formatDate(item.plannedStart)}</TableCell>
                           <TableCell>{formatDate(item.plannedEnd)}</TableCell>
