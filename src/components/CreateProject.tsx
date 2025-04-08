@@ -12,6 +12,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Project } from "@/data/mockData";
+import { createProject } from "@/lib/api";
+import { useToast } from "@/components/ui/use-toast";
 
 interface CreateProjectProps {
   open: boolean;
@@ -20,40 +22,63 @@ interface CreateProjectProps {
 }
 
 export function CreateProject({ open, onClose, onCreateProject }: CreateProjectProps) {
+  const { toast } = useToast();
   const [name, setName] = useState("");
   const [location, setLocation] = useState("");
   const [brand, setBrand] = useState<'BK' | 'TC'>("BK");
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setIsSubmitting(true);
     
-    // Create a new project with default values
-    const newProject: Project = {
-      id: `p-${Date.now()}`,
-      name,
-      location,
-      brand,
-      notes: "",
-      contractorProgress: 0,
-      ownerProgress: 0,
-      status: {
-        orders: 0,
-        ordersTotal: 10,
-        lpos: 0,
-        lposTotal: 10,
-        drawings: 0,
-        drawingsTotal: 10,
-        invoices: 0,
-        invoicesTotal: 10
+    try {
+      // Create a new project with default values
+      const newProjectData = {
+        name,
+        location,
+        brand,
+        notes: "",
+        contractorProgress: 0,
+        ownerProgress: 0,
+        status: {
+          orders: 0,
+          ordersTotal: 10,
+          lpos: 0,
+          lposTotal: 10,
+          drawings: 0,
+          drawingsTotal: 10,
+          invoices: 0,
+          invoicesTotal: 10
+        }
+      };
+      
+      const createdProject = await createProject(newProjectData);
+      
+      if (createdProject) {
+        onCreateProject(createdProject);
+        
+        // Reset form
+        setName("");
+        setLocation("");
+        setBrand("BK");
+      } else {
+        toast({
+          title: "Error",
+          description: "Failed to create project. Please try again.",
+          variant: "destructive",
+        });
       }
-    };
-    
-    onCreateProject(newProject);
-    
-    // Reset form
-    setName("");
-    setLocation("");
-    setBrand("BK");
+    } catch (error) {
+      console.error("Error creating project:", error);
+      toast({
+        title: "Error",
+        description: "An unexpected error occurred.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -103,10 +128,12 @@ export function CreateProject({ open, onClose, onCreateProject }: CreateProjectP
           </div>
           
           <DialogFooter>
-            <Button type="button" variant="outline" onClick={onClose}>
+            <Button type="button" variant="outline" onClick={onClose} disabled={isSubmitting}>
               Cancel
             </Button>
-            <Button type="submit">Create Project</Button>
+            <Button type="submit" disabled={isSubmitting}>
+              {isSubmitting ? "Creating..." : "Create Project"}
+            </Button>
           </DialogFooter>
         </form>
       </DialogContent>

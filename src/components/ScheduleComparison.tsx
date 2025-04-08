@@ -1,6 +1,7 @@
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Calendar, Download, Upload, Plus, Trash2, Check, X } from "lucide-react";
+import { useToast } from "@/components/ui/use-toast";
 import { Project, ScheduleItem } from "@/data/mockData";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -9,6 +10,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { createScheduleItem, updateScheduleItem, deleteScheduleItem } from "@/lib/api";
 
 interface ScheduleComparisonProps {
   project: Project;
@@ -16,6 +18,7 @@ interface ScheduleComparisonProps {
 }
 
 export function ScheduleComparison({ project, scheduleItems }: ScheduleComparisonProps) {
+  const { toast } = useToast();
   const [isUploading, setIsUploading] = useState(false);
   const [items, setItems] = useState<ScheduleItem[]>(scheduleItems);
   const [showAddTask, setShowAddTask] = useState(false);
@@ -29,6 +32,12 @@ export function ScheduleComparison({ project, scheduleItems }: ScheduleCompariso
   });
   const [editingItem, setEditingItem] = useState<ScheduleItem | null>(null);
   const [showQuickUpdate, setShowQuickUpdate] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  
+  // Update local items when prop changes
+  useEffect(() => {
+    setItems(scheduleItems);
+  }, [scheduleItems]);
   
   // Function to handle quick status updates
   const handleQuickUpdate = (item: ScheduleItem) => {
@@ -37,60 +46,86 @@ export function ScheduleComparison({ project, scheduleItems }: ScheduleCompariso
   };
   
   // Function to save edited item status
-  const saveQuickUpdate = (status: string) => {
+  const saveQuickUpdate = async (status: string) => {
     if (!editingItem) return;
+    setIsSubmitting(true);
     
     const today = new Date().toISOString().split('T')[0];
-    const updatedItems = items.map(item => {
-      if (item === editingItem) {
-        let updatedItem = { ...item };
-        
-        switch (status) {
-          case "not-started":
-            updatedItem.actualStart = null;
-            updatedItem.actualEnd = null;
-            break;
-          case "in-progress":
-            updatedItem.actualStart = item.actualStart || today;
-            updatedItem.actualEnd = null;
-            break;
-          case "completed":
-            updatedItem.actualStart = item.actualStart || today;
-            updatedItem.actualEnd = today;
-            break;
-          case "delayed":
-            updatedItem.delayDays = item.delayDays > 0 ? item.delayDays : 1;
-            break;
-        }
-        
-        // Calculate delay
-        if (updatedItem.actualEnd && updatedItem.plannedEnd) {
-          const planned = new Date(updatedItem.plannedEnd);
-          const actual = new Date(updatedItem.actualEnd);
-          const diffTime = actual.getTime() - planned.getTime();
-          const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-          updatedItem.delayDays = diffDays > 0 ? diffDays : 0;
-        }
-        
-        return updatedItem;
-      }
-      return item;
-    });
+    let updatedItem = { ...editingItem };
     
-    setItems(updatedItems);
-    setShowQuickUpdate(false);
-    setEditingItem(null);
+    switch (status) {
+      case "not-started":
+        updatedItem.actualStart = null;
+        updatedItem.actualEnd = null;
+        break;
+      case "in-progress":
+        updatedItem.actualStart = updatedItem.actualStart || today;
+        updatedItem.actualEnd = null;
+        break;
+      case "completed":
+        updatedItem.actualStart = updatedItem.actualStart || today;
+        updatedItem.actualEnd = today;
+        break;
+      case "delayed":
+        updatedItem.delayDays = updatedItem.delayDays > 0 ? updatedItem.delayDays : 1;
+        break;
+    }
+    
+    // Calculate delay
+    if (updatedItem.actualEnd && updatedItem.plannedEnd) {
+      const planned = new Date(updatedItem.plannedEnd);
+      const actual = new Date(updatedItem.actualEnd);
+      const diffTime = actual.getTime() - planned.getTime();
+      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+      updatedItem.delayDays = diffDays > 0 ? diffDays : 0;
+    }
+    
+    try {
+      // Update item in database
+      const savedItem = await updateScheduleItem(updatedItem.id, updatedItem);
+      
+      if (savedItem) {
+        // Update local state
+        setItems(items.map(item => 
+          item.id === editingItem.id ? savedItem : item
+        ));
+        
+        toast({
+          title: "Task Updated",
+          description: `${updatedItem.task} status has been updated.`,
+        });
+      }
+    } catch (error) {
+      console.error("Error updating task:", error);
+      toast({
+        title: "Error",
+        description: "Failed to update task status.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSubmitting(false);
+      setShowQuickUpdate(false);
+      setEditingItem(null);
+    }
   };
 
   const handleFileUpload = () => {
-    // Simulate file upload
+    // Simulate file upload - in a real app you would parse the file
+    // and create schedule items from it
     setIsUploading(true);
     setTimeout(() => {
       setIsUploading(false);
+      
+      toast({
+        title: "Schedule Uploaded",
+        description: "Schedule data has been processed.",
+      });
     }, 2000);
   };
 
-  const addNewTask = () => {
+  const addNewTask = async () => {
+    setIsSubmitting(true);
+    
     // Calculate delay days if applicable
     let delayDays = 0;
     if (newTask.actualEnd && newTask.plannedEnd) {
@@ -102,27 +137,70 @@ export function ScheduleComparison({ project, scheduleItems }: ScheduleCompariso
       }
     }
 
-    const taskToAdd: ScheduleItem = {
+    const taskToAdd = {
       ...newTask,
+      projectId: project.id,
       delayDays
     };
 
-    setItems([...items, taskToAdd]);
-    setNewTask({
-      task: "",
-      plannedStart: "",
-      plannedEnd: "",
-      actualStart: "",
-      actualEnd: "",
-      delayDays: 0
-    });
-    setShowAddTask(false);
+    try {
+      const createdTask = await createScheduleItem(taskToAdd);
+      
+      if (createdTask) {
+        setItems([...items, createdTask]);
+        
+        toast({
+          title: "Task Added",
+          description: `${newTask.task} has been added to the schedule.`,
+        });
+        
+        // Reset form
+        setNewTask({
+          task: "",
+          plannedStart: "",
+          plannedEnd: "",
+          actualStart: "",
+          actualEnd: "",
+          delayDays: 0
+        });
+        setShowAddTask(false);
+      }
+    } catch (error) {
+      console.error("Error adding task:", error);
+      toast({
+        title: "Error",
+        description: "Failed to add task.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
-  const deleteTask = (index: number) => {
-    const updatedItems = [...items];
-    updatedItems.splice(index, 1);
-    setItems(updatedItems);
+  const deleteTask = async (index: number) => {
+    const itemToDelete = items[index];
+    
+    try {
+      const success = await deleteScheduleItem(itemToDelete.id);
+      
+      if (success) {
+        const updatedItems = [...items];
+        updatedItems.splice(index, 1);
+        setItems(updatedItems);
+        
+        toast({
+          title: "Task Deleted",
+          description: `${itemToDelete.task} has been removed from the schedule.`,
+        });
+      }
+    } catch (error) {
+      console.error("Error deleting task:", error);
+      toast({
+        title: "Error",
+        description: "Failed to delete task.",
+        variant: "destructive",
+      });
+    }
   };
 
   const formatDate = (dateString: string | null) => {
@@ -248,7 +326,7 @@ export function ScheduleComparison({ project, scheduleItems }: ScheduleCompariso
               <TableBody>
                 {items.length > 0 ? (
                   items.map((item, index) => (
-                    <TableRow key={index}>
+                    <TableRow key={item.id || index}>
                       <TableCell className="font-medium">{item.task}</TableCell>
                       <TableCell>{formatDate(item.plannedStart)}</TableCell>
                       <TableCell>{formatDate(item.plannedEnd)}</TableCell>
@@ -360,10 +438,12 @@ export function ScheduleComparison({ project, scheduleItems }: ScheduleCompariso
           </div>
           
           <DialogFooter>
-            <Button type="button" variant="outline" onClick={() => setShowAddTask(false)}>
+            <Button type="button" variant="outline" onClick={() => setShowAddTask(false)} disabled={isSubmitting}>
               Cancel
             </Button>
-            <Button type="button" onClick={addNewTask}>Add Task</Button>
+            <Button type="button" onClick={addNewTask} disabled={isSubmitting}>
+              {isSubmitting ? "Adding..." : "Add Task"}
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -380,27 +460,27 @@ export function ScheduleComparison({ project, scheduleItems }: ScheduleCompariso
           <div className="py-4">
             <RadioGroup defaultValue="not-started" className="space-y-3">
               <div className="flex items-center space-x-2">
-                <RadioGroupItem value="not-started" id="not-started" onClick={() => saveQuickUpdate('not-started')} />
+                <RadioGroupItem value="not-started" id="not-started" onClick={() => saveQuickUpdate('not-started')} disabled={isSubmitting} />
                 <Label htmlFor="not-started">Not Started</Label>
               </div>
               <div className="flex items-center space-x-2">
-                <RadioGroupItem value="in-progress" id="in-progress" onClick={() => saveQuickUpdate('in-progress')} />
+                <RadioGroupItem value="in-progress" id="in-progress" onClick={() => saveQuickUpdate('in-progress')} disabled={isSubmitting} />
                 <Label htmlFor="in-progress">In Progress</Label>
               </div>
               <div className="flex items-center space-x-2">
-                <RadioGroupItem value="completed" id="completed" onClick={() => saveQuickUpdate('completed')} />
+                <RadioGroupItem value="completed" id="completed" onClick={() => saveQuickUpdate('completed')} disabled={isSubmitting} />
                 <Label htmlFor="completed">Completed</Label>
               </div>
               <div className="flex items-center space-x-2">
-                <RadioGroupItem value="delayed" id="delayed" onClick={() => saveQuickUpdate('delayed')} />
+                <RadioGroupItem value="delayed" id="delayed" onClick={() => saveQuickUpdate('delayed')} disabled={isSubmitting} />
                 <Label htmlFor="delayed">Mark as Delayed</Label>
               </div>
             </RadioGroup>
           </div>
           
           <DialogFooter>
-            <Button type="button" variant="outline" onClick={() => setShowQuickUpdate(false)}>
-              Cancel
+            <Button type="button" variant="outline" onClick={() => setShowQuickUpdate(false)} disabled={isSubmitting}>
+              {isSubmitting ? "Updating..." : "Cancel"}
             </Button>
           </DialogFooter>
         </DialogContent>
