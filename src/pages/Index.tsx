@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { useToast } from "@/components/ui/use-toast";
 import { Sidebar } from "@/components/Sidebar";
@@ -35,12 +34,10 @@ const Index = () => {
   const [orderItems, setOrderItems] = useState<any[]>([]);
   const [responsibilityItems, setResponsibilityItems] = useState<any[]>([]);
 
-  // Import mock data for initialization
   useEffect(() => {
     const initialize = async () => {
       try {
         const { projects, schedules, orders, responsibilities } = await import('@/data/mockData');
-        // Initialize the database
         await initializeDatabase({ 
           projects, 
           schedules: Object.values(schedules), 
@@ -50,7 +47,6 @@ const Index = () => {
         await fetchProjects();
       } catch (error) {
         console.error("Error during initialization:", error);
-        // Even if initialization fails, try to fetch projects
         await fetchProjects();
       }
     };
@@ -58,7 +54,6 @@ const Index = () => {
     initialize();
   }, []);
   
-  // Fetch projects
   const fetchProjects = async () => {
     setIsLoading(true);
     try {
@@ -78,7 +73,6 @@ const Index = () => {
         variant: "destructive",
       });
       
-      // Use mock data as fallback
       const { projects, schedules, orders, responsibilities } = await import('@/data/mockData');
       setProjectsList(projects);
       
@@ -93,21 +87,21 @@ const Index = () => {
     }
   };
   
-  // Fetch data for a specific project
   const fetchProjectData = async (projectId: string) => {
+    console.log("Fetching data for project:", projectId);
     setIsLoading(true);
     
     try {
-      // Fetch schedule items
       const scheduleData = await getScheduleItems(projectId);
+      console.log("Schedule data fetched:", scheduleData);
       setScheduleItems(scheduleData);
       
-      // Fetch order items
       const orderData = await getOrderItems(projectId);
+      console.log("Order data fetched:", orderData);
       setOrderItems(orderData);
       
-      // Fetch responsibility items
       const responsibilityData = await getResponsibilityItems(projectId);
+      console.log("Responsibility data fetched:", responsibilityData);
       setResponsibilityItems(responsibilityData);
     } catch (error) {
       console.error("Error fetching project data:", error);
@@ -121,9 +115,19 @@ const Index = () => {
     }
   };
 
-  const handleProjectChange = (project: Project) => {
+  const handleProjectChange = async (project: Project) => {
+    console.log("Project change handler called with:", project);
+    if (project.id === selectedProject?.id) {
+      console.log("Same project selected, skipping update");
+      return;
+    }
+    
     setSelectedProject(project);
-    fetchProjectData(project.id);
+    toast({
+      title: "Project Changed",
+      description: `Switched to ${project.name}`,
+    });
+    await fetchProjectData(project.id);
   };
 
   const handleNotesChange = async (notes: string) => {
@@ -133,10 +137,7 @@ const Index = () => {
       const updatedProject = await updateProject(selectedProject.id, { notes });
       
       if (updatedProject) {
-        // Update the project in the local state
         setSelectedProject(updatedProject);
-        
-        // Update the project in the projects list
         setProjectsList(prev => 
           prev.map(p => p.id === updatedProject.id ? updatedProject : p)
         );
@@ -158,8 +159,6 @@ const Index = () => {
 
   const handleCreateProject = async (newProject: Project) => {
     try {
-      // The created project will come back from the CreateProject component
-      // after it's saved to Supabase
       const updatedProjects = [...projectsList, newProject];
       setProjectsList(updatedProjects);
       setSelectedProject(newProject);
@@ -170,7 +169,6 @@ const Index = () => {
         description: `${newProject.name} has been created successfully.`,
       });
       
-      // Fetch initial data for the new project
       await fetchProjectData(newProject.id);
     } catch (error) {
       toast({
@@ -194,11 +192,9 @@ const Index = () => {
           description: `${selectedProject.name} has been deleted successfully.`,
         });
         
-        // Remove project from list
         const updatedProjects = projectsList.filter(p => p.id !== selectedProject.id);
         setProjectsList(updatedProjects);
         
-        // Select a different project if available
         if (updatedProjects.length > 0) {
           setSelectedProject(updatedProjects[0]);
           await fetchProjectData(updatedProjects[0].id);
@@ -226,7 +222,6 @@ const Index = () => {
     }
   };
   
-  // Refresh schedule data after changes
   const refreshScheduleData = () => {
     if (selectedProject) {
       fetchProjectData(selectedProject.id);
@@ -246,10 +241,8 @@ const Index = () => {
 
   return (
     <div className="flex flex-col md:flex-row min-h-screen">
-      {/* Sidebar */}
       <Sidebar />
       
-      {/* Main content */}
       <div className="flex-1 md:ml-20">
         {selectedProject && (
           <>
@@ -262,51 +255,42 @@ const Index = () => {
             />
             
             <main className="container mx-auto px-4 py-6 md:px-6 pb-20">
-              {/* Project Overview Section */}
               <ProjectOverview 
                 project={selectedProject}
                 onNotesChange={handleNotesChange}
               />
               
-              {/* Schedule Comparison Section */}
               <ScheduleComparison 
                 project={selectedProject}
                 scheduleItems={scheduleItems}
                 onScheduleUpdate={refreshScheduleData}
               />
               
-              {/* Site Photos Section */}
               <SitePhotos project={selectedProject} />
               
-              {/* Drawing Upload Section */}
               <DrawingUpload project={selectedProject} />
               
-              {/* Order Tracker Section */}
               <OrderTracker 
                 project={selectedProject}
                 orders={orderItems}
               />
               
-              {/* Responsibility Matrix Section */}
               <ResponsibilityMatrix 
                 project={selectedProject}
                 responsibilities={responsibilityItems}
               />
               
-              {/* Report Generator Section */}
               <ReportGenerator project={selectedProject} />
             </main>
           </>
         )}
 
-        {/* Create Project Dialog */}
         <CreateProject 
           open={showCreateProject}
           onClose={() => setShowCreateProject(false)}
           onCreateProject={handleCreateProject}
         />
         
-        {/* Delete Project Confirmation Dialog */}
         <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
           <AlertDialogContent>
             <AlertDialogHeader>

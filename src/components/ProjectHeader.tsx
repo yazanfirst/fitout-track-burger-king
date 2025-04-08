@@ -29,8 +29,12 @@ export function ProjectHeader({
             <Select
               value={selectedProject?.id}
               onValueChange={(value) => {
+                console.log("Project selection changed to:", value);
                 const selected = projects.find((p) => p.id === value);
-                if (selected) onProjectChange(selected);
+                if (selected) {
+                  console.log("Selected project:", selected);
+                  onProjectChange(selected);
+                }
               }}
             >
               <SelectTrigger className="w-full sm:w-[280px]">

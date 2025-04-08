@@ -50,6 +50,7 @@ export const getProjects = async () => {
 // Get schedule items for a project
 export const getScheduleItems = async (projectId: string) => {
   try {
+    console.log(`Fetching schedule items for project ID: ${projectId}`);
     const { data, error } = await supabase
       .from('schedules')
       .select('*')
@@ -73,6 +74,7 @@ export const getScheduleItems = async (projectId: string) => {
       description: item.description || ""
     }));
     
+    console.log(`Found ${mappedData.length} schedule items for project ${projectId}`);
     return data.length > 0 ? mappedData : (await import('@/data/mockData')).schedules[projectId] || [];
   } catch (error) {
     console.error('Error fetching schedule items:', error);
@@ -84,6 +86,7 @@ export const getScheduleItems = async (projectId: string) => {
 // Get order items for a project
 export const getOrderItems = async (projectId: string) => {
   try {
+    console.log(`Fetching order items for project ID: ${projectId}`);
     const { data, error } = await supabase
       .from('orders')
       .select('*')
@@ -107,6 +110,7 @@ export const getOrderItems = async (projectId: string) => {
       notes: item.notes || ""
     }));
     
+    console.log(`Found ${mappedData.length} order items for project ${projectId}`);
     return data.length > 0 ? mappedData : (await import('@/data/mockData')).orders[projectId] || [];
   } catch (error) {
     console.error('Error fetching order items:', error);
@@ -118,6 +122,7 @@ export const getOrderItems = async (projectId: string) => {
 // Get responsibility items for a project
 export const getResponsibilityItems = async (projectId: string) => {
   try {
+    console.log(`Fetching responsibility items for project ID: ${projectId}`);
     const { data, error } = await supabase
       .from('responsibilities')
       .select('*')
@@ -139,6 +144,7 @@ export const getResponsibilityItems = async (projectId: string) => {
       notes: item.notes || ""
     }));
     
+    console.log(`Found ${mappedData.length} responsibility items for project ${projectId}`);
     return data.length > 0 ? mappedData : (await import('@/data/mockData')).responsibilities[projectId] || [];
   } catch (error) {
     console.error('Error fetching responsibility items:', error);
