@@ -9,7 +9,171 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
-      [_ in never]: never
+      orders: {
+        Row: {
+          actual_delivery: string | null
+          expected_delivery: string | null
+          id: string
+          item_name: string
+          notes: string | null
+          order_date: string
+          project_id: string
+          quantity: number
+          status: string | null
+        }
+        Insert: {
+          actual_delivery?: string | null
+          expected_delivery?: string | null
+          id?: string
+          item_name: string
+          notes?: string | null
+          order_date?: string
+          project_id: string
+          quantity: number
+          status?: string | null
+        }
+        Update: {
+          actual_delivery?: string | null
+          expected_delivery?: string | null
+          id?: string
+          item_name?: string
+          notes?: string | null
+          order_date?: string
+          project_id?: string
+          quantity?: number
+          status?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "orders_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      projects: {
+        Row: {
+          budget: number | null
+          client: string | null
+          created_at: string
+          end_date: string | null
+          id: string
+          location: string | null
+          name: string
+          notes: string | null
+          start_date: string | null
+          status: string | null
+          updated_at: string
+        }
+        Insert: {
+          budget?: number | null
+          client?: string | null
+          created_at?: string
+          end_date?: string | null
+          id?: string
+          location?: string | null
+          name: string
+          notes?: string | null
+          start_date?: string | null
+          status?: string | null
+          updated_at?: string
+        }
+        Update: {
+          budget?: number | null
+          client?: string | null
+          created_at?: string
+          end_date?: string | null
+          id?: string
+          location?: string | null
+          name?: string
+          notes?: string | null
+          start_date?: string | null
+          status?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      responsibilities: {
+        Row: {
+          assigned_to: string
+          due_date: string | null
+          id: string
+          notes: string | null
+          project_id: string
+          status: string | null
+          task: string
+        }
+        Insert: {
+          assigned_to: string
+          due_date?: string | null
+          id?: string
+          notes?: string | null
+          project_id: string
+          status?: string | null
+          task: string
+        }
+        Update: {
+          assigned_to?: string
+          due_date?: string | null
+          id?: string
+          notes?: string | null
+          project_id?: string
+          status?: string | null
+          task?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "responsibilities_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      schedules: {
+        Row: {
+          created_at: string
+          description: string | null
+          end_date: string
+          id: string
+          project_id: string
+          start_date: string
+          status: string | null
+          title: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          end_date: string
+          id?: string
+          project_id: string
+          start_date: string
+          status?: string | null
+          title: string
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          end_date?: string
+          id?: string
+          project_id?: string
+          start_date?: string
+          status?: string | null
+          title?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "schedules_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
