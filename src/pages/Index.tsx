@@ -12,13 +12,24 @@ import { ResponsibilityMatrix } from "@/components/ResponsibilityMatrix";
 import { ReportGenerator } from "@/components/ReportGenerator";
 import { Project } from "@/data/mockData";
 import { CreateProject } from "@/components/CreateProject";
-import { getProjects, getScheduleItems, getOrderItems, getResponsibilityItems, updateProject, initializeDatabase } from "@/lib/api";
+import { getProjects, getScheduleItems, getOrderItems, getResponsibilityItems, updateProject, initializeDatabase, deleteProject } from "@/lib/api";
+import { 
+  AlertDialog, 
+  AlertDialogAction, 
+  AlertDialogCancel, 
+  AlertDialogContent, 
+  AlertDialogDescription, 
+  AlertDialogFooter, 
+  AlertDialogHeader, 
+  AlertDialogTitle 
+} from "@/components/ui/alert-dialog";
 
 const Index = () => {
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(true);
   const [selectedProject, setSelectedProject] = useState<Project | null>(null);
   const [showCreateProject, setShowCreateProject] = useState(false);
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [projectsList, setProjectsList] = useState<Project[]>([]);
   const [scheduleItems, setScheduleItems] = useState<any[]>([]);
   const [orderItems, setOrderItems] = useState<any[]>([]);
@@ -169,6 +180,58 @@ const Index = () => {
       });
     }
   };
+  
+  const handleDeleteProjectConfirm = async () => {
+    if (!selectedProject) return;
+    
+    setIsLoading(true);
+    try {
+      const success = await deleteProject(selectedProject.id);
+      
+      if (success) {
+        toast({
+          title: "Project Deleted",
+          description: `${selectedProject.name} has been deleted successfully.`,
+        });
+        
+        // Remove project from list
+        const updatedProjects = projectsList.filter(p => p.id !== selectedProject.id);
+        setProjectsList(updatedProjects);
+        
+        // Select a different project if available
+        if (updatedProjects.length > 0) {
+          setSelectedProject(updatedProjects[0]);
+          await fetchProjectData(updatedProjects[0].id);
+        } else {
+          setSelectedProject(null);
+        }
+      } else {
+        toast({
+          title: "Error",
+          description: "Failed to delete project.",
+          variant: "destructive",
+        });
+      }
+      
+      setIsDeleteDialogOpen(false);
+    } catch (error) {
+      console.error("Error deleting project:", error);
+      toast({
+        title: "Error",
+        description: "Failed to delete project.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+  
+  // Refresh schedule data after changes
+  const refreshScheduleData = () => {
+    if (selectedProject) {
+      fetchProjectData(selectedProject.id);
+    }
+  };
 
   if (isLoading && !selectedProject) {
     return (
@@ -195,6 +258,7 @@ const Index = () => {
               projects={projectsList}
               onProjectChange={handleProjectChange}
               onCreateNew={() => setShowCreateProject(true)}
+              onDeleteProject={() => setIsDeleteDialogOpen(true)}
             />
             
             <main className="container mx-auto px-4 py-6 md:px-6 pb-20">
@@ -208,6 +272,7 @@ const Index = () => {
               <ScheduleComparison 
                 project={selectedProject}
                 scheduleItems={scheduleItems}
+                onScheduleUpdate={refreshScheduleData}
               />
               
               {/* Site Photos Section */}
@@ -240,6 +305,32 @@ const Index = () => {
           onClose={() => setShowCreateProject(false)}
           onCreateProject={handleCreateProject}
         />
+        
+        {/* Delete Project Confirmation Dialog */}
+        <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Are you sure you want to delete this project?</AlertDialogTitle>
+              <AlertDialogDescription>
+                This action cannot be undone. This will permanently delete the project
+                "{selectedProject?.name}" and all of its associated data (schedules, orders, responsibilities, etc.).
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel disabled={isLoading}>Cancel</AlertDialogCancel>
+              <AlertDialogAction 
+                onClick={(e) => {
+                  e.preventDefault();
+                  handleDeleteProjectConfirm();
+                }} 
+                disabled={isLoading}
+                className="bg-red-600 hover:bg-red-700"
+              >
+                {isLoading ? "Deleting..." : "Delete Project"}
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </div>
     </div>
   );

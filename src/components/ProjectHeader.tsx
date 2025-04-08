@@ -1,130 +1,70 @@
 
-import { useState } from "react";
-import { Check, ChevronDown, Crown, Plus } from "lucide-react";
-import { cn } from "@/lib/utils";
-import { Project, projects } from "@/data/mockData";
+import React from "react";
+import { Project } from "@/data/mockData";
 import { Button } from "@/components/ui/button";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { PlusCircle, Trash2 } from "lucide-react";
 
 interface ProjectHeaderProps {
   selectedProject: Project;
-  projects?: Project[];
+  projects: Project[];
   onProjectChange: (project: Project) => void;
   onCreateNew: () => void;
+  onDeleteProject?: () => void;
 }
 
-export function ProjectHeader({ selectedProject, projects = [], onProjectChange, onCreateNew }: ProjectHeaderProps) {
-  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+export function ProjectHeader({ 
+  selectedProject, 
+  projects, 
+  onProjectChange,
+  onCreateNew,
+  onDeleteProject
+}: ProjectHeaderProps) {
   
-  const projectsList = projects.length > 0 ? projects : projects;
-
-  // Get the correct brand logo based on project brand
-  const getBrandLogo = (brand: 'BK' | 'TC') => {
-    if (brand === 'BK') {
-      return "https://www.burgerking.com.my/static/favicon/android-icon-96x96.png";
-    } else {
-      return "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcTFLsKZ2_Tl-FfE0MZ3f9bpCQXLljAcfvrB-g&usqp=CAU";
-    }
-  };
-
-  const getBrandColor = (brand: 'BK' | 'TC') => {
-    return brand === 'BK' ? 'bg-bk-red' : 'bg-tc-blue';
-  };
-
   return (
-    <header className="sticky top-0 z-30 w-full bg-white border-b border-gray-200 shadow-sm">
-      <div className="container mx-auto px-4 py-3 md:px-6">
-        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-          <div className="flex items-center">
-            <div className="relative flex items-center">
-              <img 
-                src={getBrandLogo(selectedProject.brand)}
-                alt={selectedProject.brand === 'BK' ? 'Burger King' : 'Texas Chicken'}
-                className="w-10 h-10 mr-3" 
-              />
-              <div>
-                <DropdownMenu open={isDropdownOpen} onOpenChange={setIsDropdownOpen}>
-                  <DropdownMenuTrigger asChild>
-                    <Button 
-                      variant="ghost" 
-                      className="px-0 font-medium text-lg md:text-xl hover:bg-transparent focus:bg-transparent"
-                    >
-                      <span>{selectedProject.name}</span>
-                      <ChevronDown className="ml-1 h-4 w-4" />
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="start" className="w-56">
-                    {projectsList.map((project) => (
-                      <DropdownMenuItem
-                        key={project.id}
-                        onClick={() => {
-                          onProjectChange(project);
-                          setIsDropdownOpen(false);
-                        }}
-                        className="flex items-center justify-between cursor-pointer"
-                      >
-                        <div className="flex items-center">
-                          <div className={cn(
-                            "w-2 h-2 rounded-full mr-2",
-                            getBrandColor(project.brand)
-                          )} />
-                          <span>{project.name}</span>
-                        </div>
-                        {project.id === selectedProject.id && (
-                          <Check className="h-4 w-4 text-green-500" />
-                        )}
-                      </DropdownMenuItem>
-                    ))}
-                    <DropdownMenuItem
-                      onClick={() => {
-                        onCreateNew();
-                        setIsDropdownOpen(false);
-                      }}
-                      className="border-t mt-1 pt-1"
-                    >
-                      <div className="flex items-center text-blue-600">
-                        <Plus className="h-4 w-4 mr-1" />
-                        <span>Create New Project</span>
-                      </div>
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
-                <p className="text-sm text-gray-500">{selectedProject.location}</p>
+    <div className="bg-background border-b sticky top-0 z-10">
+      <div className="container mx-auto py-4 px-4 md:px-6">
+        <div className="flex items-center justify-between">
+          <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4">
+            <Select
+              value={selectedProject?.id}
+              onValueChange={(value) => {
+                const selected = projects.find((p) => p.id === value);
+                if (selected) onProjectChange(selected);
+              }}
+            >
+              <SelectTrigger className="w-full sm:w-[280px]">
+                <SelectValue placeholder="Select a project" />
+              </SelectTrigger>
+              <SelectContent>
+                {projects.map((project) => (
+                  <SelectItem key={project.id} value={project.id}>
+                    {project.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <div className="flex items-center gap-2">
+              <div className="flex flex-col">
+                <h1 className="text-xl font-semibold">{selectedProject.name}</h1>
+                <p className="text-sm text-muted-foreground">{selectedProject.location}</p>
               </div>
             </div>
           </div>
-          
-          <div className="flex flex-wrap items-center gap-3 text-sm">
-            <div className="flex items-center px-3 py-1 bg-gray-100 rounded-full">
-              <Crown className="h-4 w-4 text-bk-gold mr-1" />
-              <span className="font-medium">
-                {selectedProject.brand === 'BK' ? 'Burger King' : 'Texas Chicken'}
-              </span>
-            </div>
-            
-            <div className="flex items-center px-3 py-1 bg-blue-50 text-blue-700 rounded-full">
-              <span className="font-medium">
-                ID: {selectedProject.id}
-              </span>
-            </div>
-            
-            <Button 
-              variant="outline" 
-              size="sm" 
-              className="ml-auto md:ml-0"
-              onClick={onCreateNew}
-            >
-              <Plus className="h-4 w-4 mr-1" />
+          <div className="flex items-center gap-2">
+            <Button variant="outline" size="sm" onClick={onCreateNew}>
+              <PlusCircle className="mr-1 h-4 w-4" />
               New Project
             </Button>
+            {onDeleteProject && (
+              <Button variant="outline" size="sm" onClick={onDeleteProject} className="text-red-500 border-red-200 hover:bg-red-50 hover:text-red-600">
+                <Trash2 className="mr-1 h-4 w-4" />
+                Delete Project
+              </Button>
+            )}
           </div>
         </div>
       </div>
-    </header>
+    </div>
   );
 }

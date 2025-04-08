@@ -279,8 +279,8 @@ export const createScheduleItem = async (itemData: Omit<ScheduleItem, 'id'>) => 
       title: task,
       start_date: plannedStart,
       end_date: plannedEnd,
-      description: itemData.description as string || '',
-      status: itemData.status as string || 'pending'
+      description: itemData.description || '',
+      status: itemData.status || 'pending'
     };
     
     const { data, error } = await supabase
@@ -383,6 +383,47 @@ export const deleteScheduleItem = async (itemId: string) => {
     return true;
   } catch (error) {
     console.error('Error deleting schedule item:', error);
+    return false;
+  }
+};
+
+// Delete a project
+export const deleteProject = async (projectId: string) => {
+  try {
+    // First delete all related records
+    
+    // Delete schedule items
+    await supabase
+      .from('schedules')
+      .delete()
+      .eq('project_id', projectId);
+      
+    // Delete order items
+    await supabase
+      .from('orders')
+      .delete()
+      .eq('project_id', projectId);
+      
+    // Delete responsibility items
+    await supabase
+      .from('responsibilities')
+      .delete()
+      .eq('project_id', projectId);
+    
+    // Then delete the project
+    const { error } = await supabase
+      .from('projects')
+      .delete()
+      .eq('id', projectId);
+      
+    if (error) {
+      console.error('Error deleting project:', error);
+      return false;
+    }
+    
+    return true;
+  } catch (error) {
+    console.error('Error deleting project:', error);
     return false;
   }
 };
@@ -522,7 +563,10 @@ export const uploadScheduleFile = async (projectId: string, file: File) => {
 };
 
 // Parse schedule file
-export const parseScheduleFile = async (projectId: string, file: File) => {
+export const parseScheduleFile = async (projectId: string, file: File): Promise<{
+  items?: Omit<ScheduleItem, 'id'>[]; 
+  error?: string;
+}> => {
   try {
     const fileUrl = await uploadScheduleFile(projectId, file);
     
@@ -537,9 +581,52 @@ export const parseScheduleFile = async (projectId: string, file: File) => {
     }
     
     if (fileType === 'xlsx' || fileType === 'xls') {
-      return mockExcelParsing(projectId);
+      try {
+        // Call our Supabase Edge Function to parse Excel files
+        const { data, error } = await supabase.functions.invoke('parse-schedule-file', {
+          body: { fileUrl, projectId, fileType },
+        });
+        
+        if (error) {
+          console.error('Error invoking parse-schedule-file function:', error);
+          return mockExcelParsing(projectId);
+        }
+        
+        if (data.error) {
+          return { error: data.error };
+        }
+        
+        return { items: data.items };
+      } catch (error) {
+        console.error('Error calling parse function:', error);
+        return mockExcelParsing(projectId);
+      }
     } else if (fileType === 'pdf') {
-      return mockPDFParsing(projectId);
+      try {
+        // Call our Supabase Edge Function to parse PDF files
+        const { data, error } = await supabase.functions.invoke('parse-schedule-file', {
+          body: { fileUrl, projectId, fileType },
+        });
+        
+        if (error) {
+          console.error('Error invoking parse-schedule-file function:', error);
+          return mockPDFParsing(projectId);
+        }
+        
+        if (data.error) {
+          return { error: data.error };
+        }
+        
+        // If we get mock data from the function, use it
+        if (data.mockItems) {
+          return { items: data.mockItems };
+        }
+        
+        return { items: data.items };
+      } catch (error) {
+        console.error('Error calling parse function:', error);
+        return mockPDFParsing(projectId);
+      }
     }
     
     return { error: "Unsupported file format" };

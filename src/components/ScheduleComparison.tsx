@@ -8,7 +8,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { DatePicker } from "@/components/ui/date-picker";
-import { PlusCircle, Upload, FileText } from "lucide-react";
+import { PlusCircle, Upload, FileText, Calendar, CalendarX, X, TrashIcon } from "lucide-react";
 import { Project, ScheduleItem } from "@/data/mockData";
 import { format, differenceInCalendarDays, parse } from "date-fns";
 import { createScheduleItem, updateScheduleItem, deleteScheduleItem, uploadScheduleFile, parseScheduleFile } from "@/lib/api";
@@ -19,13 +19,16 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 interface ScheduleComparisonProps {
   project: Project;
   scheduleItems: ScheduleItem[];
+  onScheduleUpdate?: () => void;
 }
 
-export function ScheduleComparison({ project, scheduleItems }: ScheduleComparisonProps) {
+export function ScheduleComparison({ project, scheduleItems, onScheduleUpdate }: ScheduleComparisonProps) {
   const { toast } = useToast();
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [isUpdateDialogOpen, setIsUpdateDialogOpen] = useState(false);
   const [isUploadDialogOpen, setIsUploadDialogOpen] = useState(false);
+  const [isConfirmDeleteOpen, setIsConfirmDeleteOpen] = useState(false);
+  const [itemToDelete, setItemToDelete] = useState<string | null>(null);
   const [newItem, setNewItem] = useState<Omit<ScheduleItem, 'id'>>({
     projectId: project.id,
     task: "",
@@ -41,6 +44,19 @@ export function ScheduleComparison({ project, scheduleItems }: ScheduleCompariso
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [fileParseError, setFileParseError] = useState<string | null>(null);
   const [parsedItems, setParsedItems] = useState<Omit<ScheduleItem, 'id'>[]>([]);
+
+  // Reset new item form when project changes
+  useEffect(() => {
+    setNewItem({
+      projectId: project.id,
+      task: "",
+      plannedStart: "",
+      plannedEnd: "",
+      actualStart: "",
+      actualEnd: "",
+      delayDays: 0
+    });
+  }, [project.id]);
 
   // Graph data transformation
   const graphData = scheduleItems.map(item => ({
@@ -142,6 +158,11 @@ export function ScheduleComparison({ project, scheduleItems }: ScheduleCompariso
       // Reset file and parsed items
       setSelectedFile(null);
       setParsedItems([]);
+      
+      // Notify parent to refresh data
+      if (onScheduleUpdate) {
+        onScheduleUpdate();
+      }
     } catch (error) {
       console.error("Error importing items:", error);
       toast({
@@ -194,6 +215,11 @@ export function ScheduleComparison({ project, scheduleItems }: ScheduleCompariso
           actualEnd: "",
           delayDays: 0
         });
+        
+        // Notify parent to refresh data
+        if (onScheduleUpdate) {
+          onScheduleUpdate();
+        }
       }
     } catch (error) {
       console.error("Error adding schedule item:", error);
@@ -241,6 +267,11 @@ export function ScheduleComparison({ project, scheduleItems }: ScheduleCompariso
 
         // Reset selected item
         setSelectedItem(null);
+        
+        // Notify parent to refresh data
+        if (onScheduleUpdate) {
+          onScheduleUpdate();
+        }
       }
     } catch (error) {
       console.error("Error updating schedule item:", error);
@@ -254,18 +285,39 @@ export function ScheduleComparison({ project, scheduleItems }: ScheduleCompariso
     }
   };
 
-  // Handle delete item
-  const handleDeleteItem = async (id: string) => {
-    if (!window.confirm("Are you sure you want to delete this schedule item?")) return;
+  // Open delete confirmation dialog
+  const openDeleteDialog = (id: string) => {
+    setItemToDelete(id);
+    setIsConfirmDeleteOpen(true);
+  };
 
+  // Handle delete item
+  const handleDeleteItem = async () => {
+    if (!itemToDelete) {
+      setIsConfirmDeleteOpen(false);
+      return;
+    }
+
+    setLoading(true);
+    
     try {
-      const success = await deleteScheduleItem(id);
+      const success = await deleteScheduleItem(itemToDelete);
+      
+      setIsConfirmDeleteOpen(false);
+      setItemToDelete(null);
 
       if (success) {
         toast({
           title: "Success",
           description: "Schedule item was deleted."
         });
+        
+        // Notify parent to refresh data
+        if (onScheduleUpdate) {
+          onScheduleUpdate();
+        }
+      } else {
+        throw new Error("Failed to delete");
       }
     } catch (error) {
       console.error("Error deleting schedule item:", error);
@@ -274,6 +326,8 @@ export function ScheduleComparison({ project, scheduleItems }: ScheduleCompariso
         description: "Failed to delete schedule item. Please try again.",
         variant: "destructive"
       });
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -358,7 +412,7 @@ export function ScheduleComparison({ project, scheduleItems }: ScheduleCompariso
                           <Button
                             variant="ghost"
                             size="sm"
-                            onClick={() => item.id && handleDeleteItem(item.id)}
+                            onClick={() => item.id && openDeleteDialog(item.id)}
                             className="text-red-500 hover:text-red-700 hover:bg-red-50"
                           >
                             Delete
@@ -653,6 +707,37 @@ export function ScheduleComparison({ project, scheduleItems }: ScheduleCompariso
               disabled={uploadLoading || parsedItems.length === 0}
             >
               {uploadLoading ? "Importing..." : "Import Items"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      
+      {/* Confirm Delete Dialog */}
+      <Dialog open={isConfirmDeleteOpen} onOpenChange={setIsConfirmDeleteOpen}>
+        <DialogContent className="sm:max-w-[400px]">
+          <DialogHeader>
+            <DialogTitle>Confirm Delete</DialogTitle>
+          </DialogHeader>
+          <div className="py-4">
+            <p>Are you sure you want to delete this schedule item? This action cannot be undone.</p>
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setIsConfirmDeleteOpen(false);
+                setItemToDelete(null);
+              }}
+              disabled={loading}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={handleDeleteItem}
+              disabled={loading}
+            >
+              {loading ? "Deleting..." : "Delete"}
             </Button>
           </DialogFooter>
         </DialogContent>
