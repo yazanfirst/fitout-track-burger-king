@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -9,11 +10,12 @@ import { Input } from "@/components/ui/input";
 import { DatePicker } from "@/components/ui/date-picker";
 import { PlusCircle, Upload, FileText, Calendar, CalendarX, X, TrashIcon } from "lucide-react";
 import { Project, ScheduleItem } from "@/data/mockData";
-import { format, differenceInCalendarDays, parse } from "date-fns";
-import { createScheduleItem, updateScheduleItem, deleteScheduleItem, uploadScheduleFile, parseScheduleFile } from "@/lib/api";
+import { format, differenceInCalendarDays } from "date-fns";
+import { createScheduleItem, updateScheduleItem, deleteScheduleItem, parseScheduleFile } from "@/lib/api";
 import { useToast } from "@/hooks/use-toast";
 import { Bar, BarChart, ResponsiveContainer, XAxis, YAxis } from "recharts";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { supabase } from "@/integrations/supabase/client";
 
 interface ScheduleComparisonProps {
   project: Project;
@@ -45,6 +47,8 @@ export function ScheduleComparison({ project, scheduleItems, onScheduleUpdate }:
   const [fileParseError, setFileParseError] = useState<string | null>(null);
   const [parsedItems, setParsedItems] = useState<(Omit<ScheduleItem, 'id'> & { id?: string })[]>([]);
   const [importSuccessful, setImportSuccessful] = useState(false);
+  const [pdfUrl, setPdfUrl] = useState<string | null>(null);
+  const [showPdfViewer, setShowPdfViewer] = useState(false);
 
   // Reset new item form when project changes
   useEffect(() => {
@@ -80,6 +84,8 @@ export function ScheduleComparison({ project, scheduleItems, onScheduleUpdate }:
       setSelectedFile(null);
       setParsedItems([]);
       setFileParseError(null);
+      setPdfUrl(null);
+      setShowPdfViewer(false);
       return;
     }
     
@@ -88,6 +94,8 @@ export function ScheduleComparison({ project, scheduleItems, onScheduleUpdate }:
     setFileParseError(null);
     setParsedItems([]);
     setImportSuccessful(false);
+    setPdfUrl(null);
+    setShowPdfViewer(false);
     
     // Check file type
     const fileExt = file.name.split('.').pop()?.toLowerCase();
@@ -96,11 +104,78 @@ export function ScheduleComparison({ project, scheduleItems, onScheduleUpdate }:
       return;
     }
     
-    // Auto-trigger file parsing when file is selected
-    handleFileUpload(file);
+    // Handle PDF files separately
+    if (fileExt === 'pdf') {
+      handlePdfUpload(file);
+    } else {
+      // Auto-trigger file parsing when file is selected for Excel/CSV
+      handleFileUpload(file);
+    }
   };
 
-  // Handle file upload and parsing
+  // Handle PDF upload
+  const handlePdfUpload = async (file: File) => {
+    setUploadLoading(true);
+    
+    try {
+      // Upload PDF to Supabase storage
+      const fileName = `${project.id}/schedules/pdf_${Date.now()}_${file.name}`;
+      const { data, error } = await supabase
+        .storage
+        .from('project_files')
+        .upload(fileName, file, {
+          upsert: true,
+          contentType: 'application/pdf'
+        });
+        
+      if (error) {
+        throw new Error(`Error uploading PDF: ${error.message}`);
+      }
+      
+      // Get public URL
+      const { data: urlData } = supabase
+        .storage
+        .from('project_files')
+        .getPublicUrl(fileName);
+      
+      if (!urlData?.publicUrl) {
+        throw new Error("Couldn't get public URL for uploaded PDF");
+      }
+      
+      // Save metadata to schedules table
+      await supabase
+        .from('schedules')
+        .insert({
+          project_id: project.id,
+          title: `Schedule from PDF: ${file.name}`,
+          description: `Uploaded on ${new Date().toLocaleDateString()}`,
+          status: 'pending',
+          start_date: new Date().toISOString(),
+          end_date: new Date().toISOString(),
+          file_url: urlData.publicUrl,
+          file_name: file.name,
+          uploaded_at: new Date().toISOString()
+        });
+      
+      // Set PDF URL and show PDF viewer
+      setPdfUrl(urlData.publicUrl);
+      setShowPdfViewer(true);
+      setImportSuccessful(true);
+      
+      toast({
+        title: "PDF Uploaded Successfully",
+        description: `${file.name} has been uploaded and saved.`
+      });
+      
+    } catch (error) {
+      console.error("Error handling PDF upload:", error);
+      setFileParseError(error instanceof Error ? error.message : "Failed to upload PDF file");
+    } finally {
+      setUploadLoading(false);
+    }
+  };
+
+  // Handle file upload and parsing for Excel/CSV
   const handleFileUpload = async (file?: File) => {
     const fileToUpload = file || selectedFile;
     if (!fileToUpload) return;
@@ -108,6 +183,7 @@ export function ScheduleComparison({ project, scheduleItems, onScheduleUpdate }:
     setUploadLoading(true);
     setFileParseError(null);
     setImportSuccessful(false);
+    setShowPdfViewer(false);
 
     try {
       // Upload and parse file
@@ -158,11 +234,22 @@ export function ScheduleComparison({ project, scheduleItems, onScheduleUpdate }:
       // Create each item
       for (const item of parsedItems) {
         try {
-          await createScheduleItem({
+          // Skip items that already have an ID (already saved to DB)
+          if ('id' in item && item.id) {
+            successCount++;
+            continue;
+          }
+          
+          const result = await createScheduleItem({
             ...item,
             projectId: project.id
           });
-          successCount++;
+          
+          if (result) {
+            successCount++;
+          } else {
+            errorCount++;
+          }
         } catch (error) {
           console.error("Error importing item:", error);
           errorCount++;
@@ -389,6 +476,7 @@ export function ScheduleComparison({ project, scheduleItems, onScheduleUpdate }:
           <TabsList className="mb-4">
             <TabsTrigger value="list">List View</TabsTrigger>
             <TabsTrigger value="chart">Chart View</TabsTrigger>
+            {showPdfViewer && <TabsTrigger value="pdf">PDF View</TabsTrigger>}
           </TabsList>
           <TabsContent value="list">
             <div className="rounded-md border">
@@ -473,6 +561,24 @@ export function ScheduleComparison({ project, scheduleItems, onScheduleUpdate }:
                 </ResponsiveContainer>
               )}
             </div>
+          </TabsContent>
+          <TabsContent value="pdf">
+            {pdfUrl ? (
+              <div className="w-full flex flex-col">
+                <div className="text-sm text-muted-foreground mb-2">
+                  Uploaded PDF schedule:
+                </div>
+                <iframe 
+                  src={pdfUrl} 
+                  className="w-full h-[600px] border rounded-md"
+                  title="Schedule PDF"
+                />
+              </div>
+            ) : (
+              <div className="flex items-center justify-center h-96 text-muted-foreground">
+                No PDF schedule uploaded yet.
+              </div>
+            )}
           </TabsContent>
         </Tabs>
       </CardContent>
@@ -709,7 +815,7 @@ export function ScheduleComparison({ project, scheduleItems, onScheduleUpdate }:
             {uploadLoading && (
               <div className="flex justify-center py-4">
                 <div className="animate-spin rounded-full h-6 w-6 border-2 border-gray-900 border-t-transparent"></div>
-                <span className="ml-2">Parsing file...</span>
+                <span className="ml-2">Processing file...</span>
               </div>
             )}
 
@@ -719,7 +825,15 @@ export function ScheduleComparison({ project, scheduleItems, onScheduleUpdate }:
               </Alert>
             )}
 
-            {importSuccessful && (
+            {showPdfViewer && pdfUrl && (
+              <Alert className="bg-green-50 text-green-800 border-green-200">
+                <AlertDescription>
+                  PDF uploaded successfully! You can view it in the PDF tab.
+                </AlertDescription>
+              </Alert>
+            )}
+
+            {importSuccessful && !showPdfViewer && (
               <Alert className="bg-green-50 text-green-800 border-green-200">
                 <AlertDescription>
                   File parsed successfully! {parsedItems.length} schedule items found.
@@ -727,7 +841,7 @@ export function ScheduleComparison({ project, scheduleItems, onScheduleUpdate }:
               </Alert>
             )}
 
-            {parsedItems.length > 0 && (
+            {parsedItems.length > 0 && !showPdfViewer && (
               <div className="mt-4">
                 <h3 className="text-sm font-medium mb-2">Found {parsedItems.length} schedule items:</h3>
                 <div className="max-h-60 overflow-y-auto border rounded-md">
@@ -737,6 +851,9 @@ export function ScheduleComparison({ project, scheduleItems, onScheduleUpdate }:
                         <TableHead>Task</TableHead>
                         <TableHead>Planned Start</TableHead>
                         <TableHead>Planned End</TableHead>
+                        {parsedItems.some(item => item.description) && (
+                          <TableHead>Description</TableHead>
+                        )}
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -745,11 +862,25 @@ export function ScheduleComparison({ project, scheduleItems, onScheduleUpdate }:
                           <TableCell>{item.task}</TableCell>
                           <TableCell>{formatDate(item.plannedStart)}</TableCell>
                           <TableCell>{formatDate(item.plannedEnd)}</TableCell>
+                          {parsedItems.some(item => item.description) && (
+                            <TableCell>{item.description || "-"}</TableCell>
+                          )}
                         </TableRow>
                       ))}
                     </TableBody>
                   </Table>
                 </div>
+              </div>
+            )}
+
+            {showPdfViewer && pdfUrl && (
+              <div className="mt-4 max-h-60">
+                <h3 className="text-sm font-medium mb-2">PDF Preview:</h3>
+                <iframe 
+                  src={pdfUrl} 
+                  className="w-full h-40 border rounded-md" 
+                  title="PDF Preview"
+                />
               </div>
             )}
           </div>
@@ -761,12 +892,28 @@ export function ScheduleComparison({ project, scheduleItems, onScheduleUpdate }:
             >
               Cancel
             </Button>
-            <Button
-              onClick={handleImportItems}
-              disabled={uploadLoading || parsedItems.length === 0}
-            >
-              {uploadLoading ? "Importing..." : "Import Items"}
-            </Button>
+            {parsedItems.length > 0 && !showPdfViewer ? (
+              <Button
+                onClick={handleImportItems}
+                disabled={uploadLoading || parsedItems.length === 0}
+              >
+                {uploadLoading ? "Importing..." : "Import Items"}
+              </Button>
+            ) : showPdfViewer && pdfUrl ? (
+              <Button
+                onClick={() => setIsUploadDialogOpen(false)}
+                disabled={uploadLoading}
+              >
+                Done
+              </Button>
+            ) : (
+              <Button
+                onClick={() => handleFileUpload()}
+                disabled={uploadLoading || !selectedFile}
+              >
+                {uploadLoading ? "Processing..." : "Process File"}
+              </Button>
+            )}
           </DialogFooter>
         </DialogContent>
       </Dialog>
