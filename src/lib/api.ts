@@ -16,7 +16,34 @@ export const getProjects = async () => {
       return projects;
     }
     
-    return data.length > 0 ? data : (await import('@/data/mockData')).projects;
+    // Map Supabase data to match the expected Project type
+    const mappedData = data.map(project => ({
+      id: project.id,
+      name: project.name,
+      location: project.location || "",
+      client: project.client || "",
+      notes: project.notes || "",
+      startDate: project.start_date,
+      endDate: project.end_date,
+      budget: project.budget || 0,
+      status: project.status || "planning",
+      contractorProgress: 0, // Default values since not in DB
+      ownerProgress: 0,      // Default values since not in DB
+      brand: 'BK' as 'BK' | 'TC', // Default value
+      // Add a default status object to match the expected Project type
+      status: {
+        orders: 0,
+        ordersTotal: 10,
+        lpos: 0,
+        lposTotal: 10,
+        drawings: 0,
+        drawingsTotal: 10,
+        invoices: 0,
+        invoicesTotal: 10
+      }
+    }));
+    
+    return data.length > 0 ? mappedData : (await import('@/data/mockData')).projects;
   } catch (error) {
     console.error('Error fetching projects:', error);
     const { projects } = await import('@/data/mockData');
@@ -39,7 +66,20 @@ export const getScheduleItems = async (projectId: string) => {
       return Object.values(schedules).flat().filter(item => item.projectId === projectId);
     }
     
-    return data.length > 0 ? data : (await import('@/data/mockData')).schedules[projectId] || [];
+    // Map Supabase data to match the expected ScheduleItem type
+    const mappedData = data.map(item => ({
+      id: item.id,
+      projectId: item.project_id,
+      task: item.title, 
+      plannedStart: item.start_date,
+      plannedEnd: item.end_date,
+      actualStart: "", // Default values since these might not be in DB
+      actualEnd: "",   // Default values since these might not be in DB
+      delayDays: 0,    // Default values since these might not be in DB
+      description: item.description || ""
+    }));
+    
+    return data.length > 0 ? mappedData : (await import('@/data/mockData')).schedules[projectId] || [];
   } catch (error) {
     console.error('Error fetching schedule items:', error);
     const { schedules } = await import('@/data/mockData');
@@ -62,7 +102,20 @@ export const getOrderItems = async (projectId: string) => {
       return Object.values(orders).flat().filter(item => item.projectId === projectId);
     }
     
-    return data.length > 0 ? data : (await import('@/data/mockData')).orders[projectId] || [];
+    // Map Supabase data to match the expected OrderItem type
+    const mappedData = data.map(item => ({
+      id: item.id,
+      projectId: item.project_id,
+      name: item.item_name,
+      quantity: item.quantity,
+      orderDate: item.order_date,
+      expectedDelivery: item.expected_delivery,
+      actualDelivery: item.actual_delivery,
+      status: item.status || "pending",
+      notes: item.notes || ""
+    }));
+    
+    return data.length > 0 ? mappedData : (await import('@/data/mockData')).orders[projectId] || [];
   } catch (error) {
     console.error('Error fetching order items:', error);
     const { orders } = await import('@/data/mockData');
@@ -85,7 +138,18 @@ export const getResponsibilityItems = async (projectId: string) => {
       return Object.values(responsibilities).flat().filter(item => item.projectId === projectId);
     }
     
-    return data.length > 0 ? data : (await import('@/data/mockData')).responsibilities[projectId] || [];
+    // Map Supabase data to match the expected ResponsibilityItem type
+    const mappedData = data.map(item => ({
+      id: item.id,
+      projectId: item.project_id,
+      task: item.task,
+      assignedTo: item.assigned_to,
+      dueDate: item.due_date,
+      status: item.status || "pending",
+      notes: item.notes || ""
+    }));
+    
+    return data.length > 0 ? mappedData : (await import('@/data/mockData')).responsibilities[projectId] || [];
   } catch (error) {
     console.error('Error fetching responsibility items:', error);
     const { responsibilities } = await import('@/data/mockData');
@@ -96,9 +160,20 @@ export const getResponsibilityItems = async (projectId: string) => {
 // Update a project
 export const updateProject = async (projectId: string, updates: Partial<Project>) => {
   try {
+    // Convert from Project structure to database structure
+    const dbUpdates: any = {};
+    if ('name' in updates) dbUpdates.name = updates.name;
+    if ('location' in updates) dbUpdates.location = updates.location;
+    if ('client' in updates) dbUpdates.client = updates.client;
+    if ('notes' in updates) dbUpdates.notes = updates.notes;
+    if ('budget' in updates) dbUpdates.budget = updates.budget;
+    if ('status' in updates && typeof updates.status === 'string') dbUpdates.status = updates.status;
+    if ('startDate' in updates) dbUpdates.start_date = updates.startDate;
+    if ('endDate' in updates) dbUpdates.end_date = updates.endDate;
+    
     const { data, error } = await supabase
       .from('projects')
-      .update(updates)
+      .update(dbUpdates)
       .eq('id', projectId)
       .select()
       .single();
@@ -116,7 +191,32 @@ export const updateProject = async (projectId: string, updates: Partial<Project>
       return null;
     }
     
-    return data;
+    // Map back to Project type
+    return {
+      id: data.id,
+      name: data.name,
+      location: data.location || "",
+      client: data.client || "",
+      notes: data.notes || "",
+      startDate: data.start_date,
+      endDate: data.end_date,
+      budget: data.budget || 0,
+      status: data.status || "planning",
+      contractorProgress: 0, // Default values 
+      ownerProgress: 0,      // Default values
+      brand: 'BK' as 'BK' | 'TC', // Default value
+      // Add a default status object
+      status: {
+        orders: 0,
+        ordersTotal: 10,
+        lpos: 0,
+        lposTotal: 10,
+        drawings: 0,
+        drawingsTotal: 10,
+        invoices: 0,
+        invoicesTotal: 10
+      }
+    } as Project;
   } catch (error) {
     console.error('Error updating project:', error);
     return null;
@@ -126,9 +226,21 @@ export const updateProject = async (projectId: string, updates: Partial<Project>
 // Create a new project
 export const createProject = async (projectData: Omit<Project, 'id'>) => {
   try {
+    // Convert from Project structure to database structure
+    const dbProject = {
+      name: projectData.name,
+      location: projectData.location,
+      client: projectData.client || '',
+      notes: projectData.notes || '',
+      budget: projectData.budget || 0,
+      status: projectData.status || 'planning',
+      start_date: projectData.startDate || new Date().toISOString(),
+      end_date: projectData.endDate || new Date(new Date().setMonth(new Date().getMonth() + 3)).toISOString()
+    };
+    
     const { data, error } = await supabase
       .from('projects')
-      .insert([projectData])
+      .insert([dbProject])
       .select()
       .single();
       
@@ -142,7 +254,32 @@ export const createProject = async (projectData: Omit<Project, 'id'>) => {
       return newProject as Project;
     }
     
-    return data;
+    // Map back to Project type
+    return {
+      id: data.id,
+      name: data.name,
+      location: data.location || "",
+      client: data.client || "",
+      notes: data.notes || "",
+      startDate: data.start_date,
+      endDate: data.end_date,
+      budget: data.budget || 0,
+      status: data.status || "planning",
+      contractorProgress: 0, // Default values 
+      ownerProgress: 0,      // Default values
+      brand: projectData.brand || ('BK' as 'BK' | 'TC'), // Use provided brand or default
+      // Add a default status object
+      status: {
+        orders: 0,
+        ordersTotal: 10,
+        lpos: 0,
+        lposTotal: 10,
+        drawings: 0,
+        drawingsTotal: 10,
+        invoices: 0,
+        invoicesTotal: 10
+      }
+    } as Project;
   } catch (error) {
     console.error('Error creating project:', error);
     return null;
@@ -152,16 +289,19 @@ export const createProject = async (projectData: Omit<Project, 'id'>) => {
 // Create a schedule item
 export const createScheduleItem = async (itemData: Omit<ScheduleItem, 'id'>) => {
   try {
+    // Convert from ScheduleItem structure to database structure
+    const dbItem = {
+      project_id: itemData.projectId,
+      title: itemData.task,
+      start_date: itemData.plannedStart,
+      end_date: itemData.plannedEnd,
+      description: itemData.description || '',
+      status: itemData.status || 'pending'
+    };
+    
     const { data, error } = await supabase
       .from('schedules')
-      .insert([{
-        project_id: itemData.projectId,
-        title: itemData.title,
-        start_date: itemData.startDate,
-        end_date: itemData.endDate,
-        description: itemData.description,
-        status: itemData.status
-      }])
+      .insert([dbItem])
       .select()
       .single();
       
@@ -175,7 +315,18 @@ export const createScheduleItem = async (itemData: Omit<ScheduleItem, 'id'>) => 
       return newItem as ScheduleItem;
     }
     
-    return data;
+    // Map back to ScheduleItem type
+    return {
+      id: data.id,
+      projectId: data.project_id,
+      task: data.title,
+      plannedStart: data.start_date,
+      plannedEnd: data.end_date,
+      actualStart: itemData.actualStart || '',
+      actualEnd: itemData.actualEnd || '',
+      delayDays: itemData.delayDays || 0,
+      description: data.description || ''
+    } as ScheduleItem;
   } catch (error) {
     console.error('Error creating schedule item:', error);
     return null;
@@ -187,9 +338,9 @@ export const updateScheduleItem = async (itemId: string, updates: Partial<Schedu
   try {
     // Convert from ScheduleItem structure to database structure
     const dbUpdates: any = {};
-    if ('title' in updates) dbUpdates.title = updates.title;
-    if ('startDate' in updates) dbUpdates.start_date = updates.startDate;
-    if ('endDate' in updates) dbUpdates.end_date = updates.endDate;
+    if ('task' in updates) dbUpdates.title = updates.task;
+    if ('plannedStart' in updates) dbUpdates.start_date = updates.plannedStart;
+    if ('plannedEnd' in updates) dbUpdates.end_date = updates.plannedEnd;
     if ('description' in updates) dbUpdates.description = updates.description;
     if ('status' in updates) dbUpdates.status = updates.status;
     
@@ -221,7 +372,18 @@ export const updateScheduleItem = async (itemId: string, updates: Partial<Schedu
       return updatedItem;
     }
     
-    return data;
+    // Map back to ScheduleItem type
+    return {
+      id: data.id,
+      projectId: data.project_id,
+      task: data.title,
+      plannedStart: data.start_date,
+      plannedEnd: data.end_date,
+      actualStart: updates.actualStart || '',
+      actualEnd: updates.actualEnd || '',
+      delayDays: updates.delayDays || 0,
+      description: data.description || ''
+    } as ScheduleItem;
   } catch (error) {
     console.error('Error updating schedule item:', error);
     return null;
@@ -312,32 +474,48 @@ export const initializeDatabase = async (mockData: {
   try {
     console.info('Initializing database with mock data...');
     
-    // Clear existing data (in development)
-    await supabase.from('schedules').delete().neq('id', '00000000-0000-0000-0000-000000000000');
-    await supabase.from('orders').delete().neq('id', '00000000-0000-0000-0000-000000000000');
-    await supabase.from('responsibilities').delete().neq('id', '00000000-0000-0000-0000-000000000000');
-    await supabase.from('projects').delete().neq('id', '00000000-0000-0000-0000-000000000000');
-    
-    // Insert mock projects
-    if (mockData.projects.length > 0) {
-      const { error: projectsError } = await supabase
+    // Only attempt to initialize if there are mock projects
+    if (mockData.projects && mockData.projects.length > 0) {
+      // First check if projects already exist
+      const { data: existingProjects } = await supabase
         .from('projects')
-        .insert(mockData.projects.map(p => ({
-          id: p.id,
-          name: p.name,
-          location: p.location,
-          client: p.client,
-          notes: p.notes || '',
-          budget: p.budget || 0,
-          status: p.status || 'planning',
-          start_date: p.startDate || new Date().toISOString(),
-          end_date: p.endDate || new Date(new Date().setMonth(new Date().getMonth() + 3)).toISOString()
-        })));
+        .select('id')
+        .limit(1);
         
-      if (projectsError) console.error('Error inserting mock projects:', projectsError);
+      if (existingProjects && existingProjects.length > 0) {
+        console.log('Database already initialized, skipping...');
+        return { success: true, message: 'Database already contains data' };
+      }
+      
+      // Format projects for database insertion
+      const dbProjects = mockData.projects.map(p => ({
+        // Use UUID if available, otherwise generate a new one
+        id: p.id && p.id.match(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i) ? p.id : undefined,
+        name: p.name,
+        location: p.location || null,
+        client: p.client || null,
+        notes: p.notes || null,
+        budget: p.budget || null,
+        status: p.status || 'planning',
+        start_date: p.startDate || new Date().toISOString(),
+        end_date: p.endDate || new Date(new Date().setMonth(new Date().getMonth() + 3)).toISOString()
+      }));
+      
+      // Insert projects
+      const { error: projectsError, data: insertedProjects } = await supabase
+        .from('projects')
+        .insert(dbProjects)
+        .select();
+        
+      if (projectsError) {
+        console.error('Error inserting mock projects:', projectsError);
+        return { success: false, error: projectsError };
+      }
+      
+      console.log('Successfully initialized projects:', insertedProjects);
+      
+      // Could add additional initializations for schedules, orders, etc. here
     }
-    
-    // Insert other mock data as needed...
     
     return { success: true, message: 'Database initialized with mock data' };
   } catch (error) {
