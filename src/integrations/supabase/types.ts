@@ -135,7 +135,10 @@ export type Database = {
       }
       schedules: {
         Row: {
+          actual_end: string | null
+          actual_start: string | null
           created_at: string
+          delay_days: number | null
           description: string | null
           end_date: string
           id: string
@@ -145,7 +148,10 @@ export type Database = {
           title: string
         }
         Insert: {
+          actual_end?: string | null
+          actual_start?: string | null
           created_at?: string
+          delay_days?: number | null
           description?: string | null
           end_date: string
           id?: string
@@ -155,7 +161,10 @@ export type Database = {
           title: string
         }
         Update: {
+          actual_end?: string | null
+          actual_start?: string | null
           created_at?: string
+          delay_days?: number | null
           description?: string | null
           end_date?: string
           id?: string
