@@ -1,4 +1,3 @@
-
 import { supabase } from '@/integrations/supabase/client';
 import { Project, ScheduleItem, OrderItem, ResponsibilityItem } from '@/data/mockData';
 import { Database } from '@/integrations/supabase/types';

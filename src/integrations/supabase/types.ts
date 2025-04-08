@@ -137,7 +137,6 @@ export type Database = {
         Row: {
           actual_end: string | null
           actual_start: string | null
-          created_at: string
           delay_days: number | null
           description: string | null
           end_date: string
@@ -150,7 +149,6 @@ export type Database = {
         Insert: {
           actual_end?: string | null
           actual_start?: string | null
-          created_at?: string
           delay_days?: number | null
           description?: string | null
           end_date: string
@@ -163,7 +161,6 @@ export type Database = {
         Update: {
           actual_end?: string | null
           actual_start?: string | null
-          created_at?: string
           delay_days?: number | null
           description?: string | null
           end_date?: string

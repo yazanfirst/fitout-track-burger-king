@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -36,7 +35,8 @@ export function ScheduleComparison({ project, scheduleItems, onScheduleUpdate }:
     plannedEnd: "",
     actualStart: "",
     actualEnd: "",
-    delayDays: 0
+    delayDays: 0,
+    description: ""
   });
   const [selectedItem, setSelectedItem] = useState<ScheduleItem | null>(null);
   const [loading, setLoading] = useState(false);
@@ -54,7 +54,8 @@ export function ScheduleComparison({ project, scheduleItems, onScheduleUpdate }:
       plannedEnd: "",
       actualStart: "",
       actualEnd: "",
-      delayDays: 0
+      delayDays: 0,
+      description: ""
     });
   }, [project.id]);
 
@@ -217,7 +218,8 @@ export function ScheduleComparison({ project, scheduleItems, onScheduleUpdate }:
           plannedEnd: "",
           actualStart: "",
           actualEnd: "",
-          delayDays: 0
+          delayDays: 0,
+          description: ""
         });
         
         // Notify parent to refresh data
@@ -472,6 +474,15 @@ export function ScheduleComparison({ project, scheduleItems, onScheduleUpdate }:
                 />
               </div>
             </div>
+            <div>
+              <Label htmlFor="description">Description (Optional)</Label>
+              <Input
+                id="description"
+                value={newItem.description || ""}
+                onChange={(e) => setNewItem({ ...newItem, description: e.target.value })}
+                placeholder="Enter description"
+              />
+            </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <Label>Planned Start Date</Label>
@@ -563,6 +574,20 @@ export function ScheduleComparison({ project, scheduleItems, onScheduleUpdate }:
                     placeholder="Enter task name"
                   />
                 </div>
+              </div>
+              <div>
+                <Label htmlFor="update-description">Description (Optional)</Label>
+                <Input
+                  id="update-description"
+                  value={selectedItem.description || ""}
+                  onChange={(e) =>
+                    setSelectedItem({
+                      ...selectedItem,
+                      description: e.target.value,
+                    })
+                  }
+                  placeholder="Enter description"
+                />
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
