@@ -26,6 +26,7 @@ export function CreateProject({ open, onClose, onCreateProject }: CreateProjectP
   const [name, setName] = useState("");
   const [location, setLocation] = useState("");
   const [brand, setBrand] = useState<'BK' | 'TC'>("BK");
+  const [client, setClient] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -38,9 +39,13 @@ export function CreateProject({ open, onClose, onCreateProject }: CreateProjectP
         name,
         location,
         brand,
+        client, // Added client field
         notes: "",
         contractorProgress: 0,
         ownerProgress: 0,
+        budget: 0, // Added budget field with default value
+        startDate: new Date().toISOString().split('T')[0], // Added startDate field with current date
+        endDate: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], // Added endDate field with date 1 year from now
         status: {
           orders: 0,
           ordersTotal: 10,
@@ -62,6 +67,7 @@ export function CreateProject({ open, onClose, onCreateProject }: CreateProjectP
         setName("");
         setLocation("");
         setBrand("BK");
+        setClient("");
       } else {
         toast({
           title: "Error",
@@ -107,6 +113,17 @@ export function CreateProject({ open, onClose, onCreateProject }: CreateProjectP
               value={location}
               onChange={(e) => setLocation(e.target.value)}
               placeholder="Enter project location"
+              required
+            />
+          </div>
+          
+          <div className="grid w-full items-center gap-1.5">
+            <Label htmlFor="project-client">Client</Label>
+            <Input
+              id="project-client"
+              value={client}
+              onChange={(e) => setClient(e.target.value)}
+              placeholder="Enter client name"
               required
             />
           </div>

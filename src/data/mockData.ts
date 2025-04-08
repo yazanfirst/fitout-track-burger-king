@@ -12,7 +12,7 @@ export type Project = {
   ownerProgress: number;
   brand: 'BK' | 'TC';
   notes?: string;
-  status?: string | {
+  status: {
     orders: number;
     ordersTotal: number;
     lpos: number;
@@ -47,6 +47,10 @@ export type OrderItem = {
   actualDelivery?: string;
   status: string;
   notes?: string;
+  category: string;
+  ordered: boolean;
+  lpoReceived: boolean;
+  invoiceStatus: string;
 };
 
 export type ResponsibilityItem = {
@@ -57,6 +61,7 @@ export type ResponsibilityItem = {
   dueDate?: string;
   status?: string;
   notes?: string;
+  responsibleParty: "Owner" | "Contractor";
 };
 
 export const projects: Project[] = [
@@ -161,6 +166,8 @@ export const schedules: { [projectId: string]: ScheduleItem[] } = {
       actualStart: "2023-01-01",
       actualEnd: "2023-01-14",
       delayDays: 0,
+      status: "completed",
+      description: "Initial project planning phase"
     },
     {
       id: "s-2",
@@ -171,6 +178,8 @@ export const schedules: { [projectId: string]: ScheduleItem[] } = {
       actualStart: "2023-01-16",
       actualEnd: "2023-01-30",
       delayDays: 0,
+      status: "completed",
+      description: "Site survey and measurements"
     },
     {
       id: "s-3",
@@ -181,6 +190,8 @@ export const schedules: { [projectId: string]: ScheduleItem[] } = {
       actualStart: "2023-02-01",
       actualEnd: "2023-03-10",
       delayDays: 10,
+      status: "completed",
+      description: "Foundation work and site preparation"
     },
   ],
   "p-2": [
@@ -193,6 +204,8 @@ export const schedules: { [projectId: string]: ScheduleItem[] } = {
       actualStart: "2023-02-15",
       actualEnd: "2023-02-27",
       delayDays: 0,
+      status: "completed",
+      description: "Initial project planning and scope definition"
     },
     {
       id: "s-5",
@@ -203,6 +216,8 @@ export const schedules: { [projectId: string]: ScheduleItem[] } = {
       actualStart: null,
       actualEnd: null,
       delayDays: 0,
+      status: "in progress",
+      description: "Obtaining required permits and approvals"
     },
   ],
   "p-3": [
@@ -215,6 +230,8 @@ export const schedules: { [projectId: string]: ScheduleItem[] } = {
       actualStart: "2023-03-01",
       actualEnd: "2023-03-14",
       delayDays: 0,
+      status: "completed",
+      description: "Demolition of existing structure"
     },
     {
       id: "s-7",
@@ -225,6 +242,8 @@ export const schedules: { [projectId: string]: ScheduleItem[] } = {
       actualStart: "2023-03-16",
       actualEnd: "2023-10-30",
       delayDays: 0,
+      status: "completed",
+      description: "Construction of new structure"
     },
   ],
   "p-4": [
@@ -237,6 +256,8 @@ export const schedules: { [projectId: string]: ScheduleItem[] } = {
       actualStart: "2023-04-10",
       actualEnd: "2023-04-29",
       delayDays: 0,
+      status: "completed",
+      description: "Project planning and design"
     },
     {
       id: "s-9",
@@ -247,6 +268,8 @@ export const schedules: { [projectId: string]: ScheduleItem[] } = {
       actualStart: null,
       actualEnd: null,
       delayDays: 0,
+      status: "in progress",
+      description: "Architectural design and planning"
     },
   ],
 };
@@ -263,6 +286,10 @@ export const orders: { [projectId: string]: OrderItem[] } = {
       actualDelivery: "2023-02-14",
       status: "delivered",
       notes: "High quality steel beams for foundation.",
+      category: "Structure",
+      ordered: true,
+      lpoReceived: true,
+      invoiceStatus: "100%"
     },
     {
       id: "o-2",
@@ -274,6 +301,10 @@ export const orders: { [projectId: string]: OrderItem[] } = {
       actualDelivery: "2023-02-09",
       status: "delivered",
       notes: "Ready-mix concrete for foundation.",
+      category: "Materials",
+      ordered: true,
+      lpoReceived: true,
+      invoiceStatus: "50%"
     },
   ],
   "p-2": [
@@ -286,6 +317,10 @@ export const orders: { [projectId: string]: OrderItem[] } = {
       expectedDelivery: "2023-03-15",
       status: "pending",
       notes: "Various sizes of lumber for framing.",
+      category: "Materials",
+      ordered: true,
+      lpoReceived: false,
+      invoiceStatus: "0%"
     },
   ],
   "p-3": [
@@ -299,6 +334,10 @@ export const orders: { [projectId: string]: OrderItem[] } = {
       actualDelivery: "2023-03-30",
       status: "delivered",
       notes: "Standard size bricks for construction.",
+      category: "Materials",
+      ordered: true,
+      lpoReceived: true,
+      invoiceStatus: "100%"
     },
   ],
   "p-4": [
@@ -311,6 +350,10 @@ export const orders: { [projectId: string]: OrderItem[] } = {
       expectedDelivery: "2023-04-22",
       status: "pending",
       notes: "Annual licenses for architectural design software.",
+      category: "Software",
+      ordered: true,
+      lpoReceived: false,
+      invoiceStatus: "0%"
     },
   ],
 };
@@ -325,6 +368,7 @@ export const responsibilities: { [projectId: string]: ResponsibilityItem[] } = {
       dueDate: "2023-02-28",
       status: "completed",
       notes: "Ensure foundation meets safety standards.",
+      responsibleParty: "Contractor"
     },
     {
       id: "r-2",
@@ -334,6 +378,7 @@ export const responsibilities: { [projectId: string]: ResponsibilityItem[] } = {
       dueDate: "2023-03-15",
       status: "in progress",
       notes: "Install electrical wiring and outlets.",
+      responsibleParty: "Contractor"
     },
   ],
   "p-2": [
@@ -345,6 +390,7 @@ export const responsibilities: { [projectId: string]: ResponsibilityItem[] } = {
       dueDate: "2023-04-15",
       status: "pending",
       notes: "Inspect framing for structural integrity.",
+      responsibleParty: "Owner"
     },
   ],
   "p-3": [
@@ -356,6 +402,7 @@ export const responsibilities: { [projectId: string]: ResponsibilityItem[] } = {
       dueDate: "2023-04-30",
       status: "completed",
       notes: "Lay bricks for exterior walls.",
+      responsibleParty: "Contractor"
     },
   ],
   "p-4": [
@@ -367,6 +414,7 @@ export const responsibilities: { [projectId: string]: ResponsibilityItem[] } = {
       dueDate: "2023-05-01",
       status: "pending",
       notes: "Install design software on workstations.",
+      responsibleParty: "Owner"
     },
   ],
 };
