@@ -572,6 +572,7 @@ export const uploadScheduleFile = async (projectId: string, file: File) => {
 export const parseScheduleFile = async (projectId: string, file: File): Promise<{
   items?: Omit<ScheduleItem, 'id'>[]; 
   error?: string;
+  message?: string;
 }> => {
   try {
     const fileUrl = await uploadScheduleFile(projectId, file);
@@ -586,56 +587,50 @@ export const parseScheduleFile = async (projectId: string, file: File): Promise<
       return await parseCSVFile(file, projectId);
     }
     
-    if (fileType === 'xlsx' || fileType === 'xls') {
+    if (fileType === 'xlsx' || fileType === 'xls' || fileType === 'pdf' || fileType === 'csv') {
       try {
-        // Call our Supabase Edge Function to parse Excel files
+        console.log(`Calling parse-schedule-file function for ${fileType} file`);
+        
+        // Call our Supabase Edge Function to parse files
         const { data, error } = await supabase.functions.invoke('parse-schedule-file', {
           body: { fileUrl, projectId, fileType },
         });
         
-        if (error) {
-          console.error('Error invoking parse-schedule-file function:', error);
-          return mockExcelParsing(projectId);
-        }
-        
-        if (data.error) {
-          return { error: data.error };
-        }
-        
-        return { items: data.items };
-      } catch (error) {
-        console.error('Error calling parse function:', error);
-        return mockExcelParsing(projectId);
-      }
-    } else if (fileType === 'pdf') {
-      try {
-        // Call our Supabase Edge Function to parse PDF files
-        const { data, error } = await supabase.functions.invoke('parse-schedule-file', {
-          body: { fileUrl, projectId, fileType },
-        });
+        console.log("Edge function response:", data);
         
         if (error) {
           console.error('Error invoking parse-schedule-file function:', error);
-          return mockPDFParsing(projectId);
+          return fileType === 'xlsx' || fileType === 'xls' 
+            ? mockExcelParsing(projectId) 
+            : mockPDFParsing(projectId);
         }
         
         if (data.error) {
+          console.error('Edge function returned error:', data.error);
           return { error: data.error };
         }
         
-        // If we get mock data from the function, use it
+        // Handle the case where mockItems are returned for PDF files
         if (data.mockItems) {
-          return { items: data.mockItems };
+          return { 
+            items: data.mockItems,
+            message: "PDF parsing used mock data as it couldn't extract the exact schedule."
+          };
         }
         
-        return { items: data.items };
+        return { 
+          items: data.items,
+          message: data.message
+        };
       } catch (error) {
         console.error('Error calling parse function:', error);
-        return mockPDFParsing(projectId);
+        return fileType === 'xlsx' || fileType === 'xls' 
+          ? mockExcelParsing(projectId) 
+          : mockPDFParsing(projectId);
       }
     }
     
-    return { error: "Unsupported file format" };
+    return { error: "Unsupported file format. Please upload CSV, Excel, or PDF files." };
   } catch (error) {
     console.error('Error parsing schedule file:', error);
     return { error: "Failed to parse file" };

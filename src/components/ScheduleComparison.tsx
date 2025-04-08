@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -111,7 +110,7 @@ export function ScheduleComparison({ project, scheduleItems, onScheduleUpdate }:
         setParsedItems(result.items);
         toast({
           title: "File Parsed Successfully",
-          description: `${result.items.length} items found in the file.`
+          description: result.message || `${result.items.length} items found in the file.`
         });
       } else {
         setFileParseError("No valid schedule items found in the file.");
