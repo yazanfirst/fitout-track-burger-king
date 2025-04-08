@@ -1,4 +1,3 @@
-
 export interface Project {
   id: string;
   name: string;
@@ -20,6 +19,8 @@ export interface Project {
 }
 
 export interface ScheduleItem {
+  id?: string;
+  projectId?: string;
   task: string;
   plannedStart: string;
   plannedEnd: string;
