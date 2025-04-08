@@ -1,6 +1,6 @@
 
 import { useState } from "react";
-import { Check, ChevronDown, Crown } from "lucide-react";
+import { Check, ChevronDown, Crown, Plus } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Project, projects } from "@/data/mockData";
 import { Button } from "@/components/ui/button";
@@ -13,11 +13,15 @@ import {
 
 interface ProjectHeaderProps {
   selectedProject: Project;
+  projects?: Project[];
   onProjectChange: (project: Project) => void;
+  onCreateNew: () => void;
 }
 
-export function ProjectHeader({ selectedProject, onProjectChange }: ProjectHeaderProps) {
+export function ProjectHeader({ selectedProject, projects = [], onProjectChange, onCreateNew }: ProjectHeaderProps) {
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+  
+  const projectsList = projects.length > 0 ? projects : projects;
 
   // Get the correct brand logo based on project brand
   const getBrandLogo = (brand: 'BK' | 'TC') => {
@@ -55,7 +59,7 @@ export function ProjectHeader({ selectedProject, onProjectChange }: ProjectHeade
                     </Button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="start" className="w-56">
-                    {projects.map((project) => (
+                    {projectsList.map((project) => (
                       <DropdownMenuItem
                         key={project.id}
                         onClick={() => {
@@ -76,6 +80,18 @@ export function ProjectHeader({ selectedProject, onProjectChange }: ProjectHeade
                         )}
                       </DropdownMenuItem>
                     ))}
+                    <DropdownMenuItem
+                      onClick={() => {
+                        onCreateNew();
+                        setIsDropdownOpen(false);
+                      }}
+                      className="border-t mt-1 pt-1"
+                    >
+                      <div className="flex items-center text-blue-600">
+                        <Plus className="h-4 w-4 mr-1" />
+                        <span>Create New Project</span>
+                      </div>
+                    </DropdownMenuItem>
                   </DropdownMenuContent>
                 </DropdownMenu>
                 <p className="text-sm text-gray-500">{selectedProject.location}</p>
@@ -96,6 +112,16 @@ export function ProjectHeader({ selectedProject, onProjectChange }: ProjectHeade
                 ID: {selectedProject.id}
               </span>
             </div>
+            
+            <Button 
+              variant="outline" 
+              size="sm" 
+              className="ml-auto md:ml-0"
+              onClick={onCreateNew}
+            >
+              <Plus className="h-4 w-4 mr-1" />
+              New Project
+            </Button>
           </div>
         </div>
       </div>

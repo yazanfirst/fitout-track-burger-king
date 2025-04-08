@@ -10,10 +10,12 @@ import { OrderTracker } from "@/components/OrderTracker";
 import { ResponsibilityMatrix } from "@/components/ResponsibilityMatrix";
 import { ReportGenerator } from "@/components/ReportGenerator";
 import { Project, projects, schedules, orders, responsibilities } from "@/data/mockData";
-import { TooltipProvider } from "@/components/ui/tooltip";
+import { CreateProject } from "@/components/CreateProject";
 
 const Index = () => {
   const [selectedProject, setSelectedProject] = useState<Project>(projects[0]);
+  const [showCreateProject, setShowCreateProject] = useState(false);
+  const [projectsList, setProjectsList] = useState<Project[]>(projects);
 
   const handleProjectChange = (project: Project) => {
     setSelectedProject(project);
@@ -22,6 +24,13 @@ const Index = () => {
   const handleNotesChange = (notes: string) => {
     // This would typically update the project in a database
     console.log("Notes updated for project", selectedProject.id, ":", notes);
+  };
+
+  const handleCreateProject = (newProject: Project) => {
+    const updatedProjects = [...projectsList, newProject];
+    setProjectsList(updatedProjects);
+    setSelectedProject(newProject);
+    setShowCreateProject(false);
   };
 
   return (
@@ -33,7 +42,9 @@ const Index = () => {
       <div className="flex-1 md:ml-20">
         <ProjectHeader 
           selectedProject={selectedProject}
+          projects={projectsList}
           onProjectChange={handleProjectChange}
+          onCreateNew={() => setShowCreateProject(true)}
         />
         
         <main className="container mx-auto px-4 py-6 md:px-6 pb-20">
@@ -70,6 +81,13 @@ const Index = () => {
           {/* Report Generator Section */}
           <ReportGenerator project={selectedProject} />
         </main>
+
+        {/* Create Project Dialog */}
+        <CreateProject 
+          open={showCreateProject}
+          onClose={() => setShowCreateProject(false)}
+          onCreateProject={handleCreateProject}
+        />
       </div>
     </div>
   );
