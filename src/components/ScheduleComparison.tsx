@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -91,18 +92,22 @@ export function ScheduleComparison({ project, scheduleItems, onScheduleUpdate }:
       setFileParseError("Unsupported file format. Please upload CSV, Excel, or PDF files.");
       return;
     }
+    
+    // Auto-trigger file parsing when file is selected
+    handleFileUpload(file);
   };
 
   // Handle file upload and parsing
-  const handleFileUpload = async () => {
-    if (!selectedFile) return;
+  const handleFileUpload = async (file?: File) => {
+    const fileToUpload = file || selectedFile;
+    if (!fileToUpload) return;
     
     setUploadLoading(true);
     setFileParseError(null);
 
     try {
       // Upload and parse file
-      const result = await parseScheduleFile(project.id, selectedFile);
+      const result = await parseScheduleFile(project.id, fileToUpload);
       
       if (result.error) {
         setFileParseError(result.error);
@@ -647,19 +652,20 @@ export function ScheduleComparison({ project, scheduleItems, onScheduleUpdate }:
                   accept=".csv,.xlsx,.xls,.pdf"
                   onChange={handleFileSelect}
                   className="flex-1"
+                  disabled={uploadLoading}
                 />
-                <Button 
-                  onClick={handleFileUpload}
-                  disabled={!selectedFile || uploadLoading}
-                  size="sm"
-                >
-                  {uploadLoading ? "Parsing..." : "Parse"}
-                </Button>
               </div>
               <div className="text-xs text-muted-foreground mt-1">
                 Supported formats: CSV, Excel (xlsx, xls), PDF
               </div>
             </div>
+
+            {uploadLoading && (
+              <div className="flex justify-center py-4">
+                <div className="animate-spin rounded-full h-6 w-6 border-2 border-gray-900 border-t-transparent"></div>
+                <span className="ml-2">Parsing file...</span>
+              </div>
+            )}
 
             {fileParseError && (
               <Alert variant="destructive">

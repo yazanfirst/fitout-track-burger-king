@@ -125,13 +125,12 @@ serve(async (req) => {
               }
               
               return {
-                projectId,
-                task: String(row[inferredTaskColumn]),
-                plannedStart: startDate.toISOString(),
-                plannedEnd: endDate.toISOString(),
-                actualStart: '',
-                actualEnd: '',
-                delayDays: 0
+                project_id: projectId,
+                title: String(row[inferredTaskColumn]),
+                start_date: startDate.toISOString(),
+                end_date: endDate.toISOString(),
+                status: 'pending',
+                description: ''
               };
             })
             .filter(item => item !== null); // Remove invalid items
@@ -172,13 +171,12 @@ serve(async (req) => {
             }
             
             return {
-              projectId,
-              task: String(row[taskColumn]),
-              plannedStart: startDate.toISOString(),
-              plannedEnd: endDate.toISOString(),
-              actualStart: '',
-              actualEnd: '',
-              delayDays: 0
+              project_id: projectId,
+              title: String(row[taskColumn]),
+              start_date: startDate.toISOString(),
+              end_date: endDate.toISOString(),
+              status: 'pending',
+              description: ''
             };
           })
           .filter(item => item !== null); // Remove invalid items
@@ -220,13 +218,12 @@ serve(async (req) => {
                 
                 if (!isNaN(startDate.getTime()) && !isNaN(endDate.getTime())) {
                   tasks.push({
-                    projectId,
-                    task: task.trim(),
-                    plannedStart: startDate.toISOString(),
-                    plannedEnd: endDate.toISOString(),
-                    actualStart: '',
-                    actualEnd: '',
-                    delayDays: 0
+                    project_id: projectId,
+                    title: task.trim(),
+                    start_date: startDate.toISOString(),
+                    end_date: endDate.toISOString(),
+                    status: 'pending',
+                    description: ''
                   });
                 }
               } catch (e) {
@@ -273,13 +270,12 @@ serve(async (req) => {
                     .replace(/[:\-,.\s]+$/, ''); // Remove trailing punctuation
                   
                   tasks.push({
-                    projectId,
-                    task: taskName,
-                    plannedStart: startDate.toISOString(),
-                    plannedEnd: endDate.toISOString(),
-                    actualStart: '',
-                    actualEnd: '',
-                    delayDays: 0
+                    project_id: projectId,
+                    title: taskName,
+                    start_date: startDate.toISOString(),
+                    end_date: endDate.toISOString(),
+                    status: 'pending',
+                    description: ''
                   });
                 }
               } catch (e) {
@@ -324,13 +320,12 @@ serve(async (req) => {
                         
                         if (!isNaN(startDate.getTime()) && !isNaN(endDate.getTime())) {
                           tasks.push({
-                            projectId,
-                            task: taskName,
-                            plannedStart: startDate.toISOString(),
-                            plannedEnd: endDate.toISOString(),
-                            actualStart: '',
-                            actualEnd: '',
-                            delayDays: 0
+                            project_id: projectId,
+                            title: taskName,
+                            start_date: startDate.toISOString(),
+                            end_date: endDate.toISOString(),
+                            status: 'pending',
+                            description: ''
                           });
                         }
                       }
@@ -375,13 +370,12 @@ serve(async (req) => {
               startDate.setDate(startDate.getDate() + 1); // Start next task after previous
               
               return {
-                projectId,
-                task: `${keyword} Work`,
-                plannedStart: taskStartDate.toISOString(),
-                plannedEnd: taskEndDate.toISOString(),
-                actualStart: '',
-                actualEnd: '',
-                delayDays: 0
+                project_id: projectId,
+                title: `${keyword} Work`,
+                start_date: taskStartDate.toISOString(),
+                end_date: taskEndDate.toISOString(),
+                status: 'pending',
+                description: ''
               };
             });
             
@@ -390,31 +384,28 @@ serve(async (req) => {
             // Default mock data using common construction phases
             items = [
               {
-                projectId,
-                task: "Site Preparation (Extracted from PDF)",
-                plannedStart: today.toISOString(),
-                plannedEnd: new Date(today.getTime() + 10 * 24 * 60 * 60 * 1000).toISOString(),
-                actualStart: '',
-                actualEnd: '',
-                delayDays: 0
+                project_id: projectId,
+                title: "Site Preparation (Extracted from PDF)",
+                start_date: today.toISOString(),
+                end_date: new Date(today.getTime() + 10 * 24 * 60 * 60 * 1000).toISOString(),
+                status: 'pending',
+                description: ''
               },
               {
-                projectId,
-                task: "Foundation Work (Extracted from PDF)",
-                plannedStart: new Date(today.getTime() + 11 * 24 * 60 * 60 * 1000).toISOString(),
-                plannedEnd: new Date(today.getTime() + 25 * 24 * 60 * 60 * 1000).toISOString(),
-                actualStart: '',
-                actualEnd: '',
-                delayDays: 0
+                project_id: projectId,
+                title: "Foundation Work (Extracted from PDF)",
+                start_date: new Date(today.getTime() + 11 * 24 * 60 * 60 * 1000).toISOString(),
+                end_date: new Date(today.getTime() + 25 * 24 * 60 * 60 * 1000).toISOString(),
+                status: 'pending',
+                description: ''
               },
               {
-                projectId,
-                task: "Structural Assembly (Extracted from PDF)",
-                plannedStart: new Date(today.getTime() + 26 * 24 * 60 * 60 * 1000).toISOString(),
-                plannedEnd: new Date(today.getTime() + 45 * 24 * 60 * 60 * 1000).toISOString(),
-                actualStart: '',
-                actualEnd: '',
-                delayDays: 0
+                project_id: projectId,
+                title: "Structural Assembly (Extracted from PDF)",
+                start_date: new Date(today.getTime() + 26 * 24 * 60 * 60 * 1000).toISOString(),
+                end_date: new Date(today.getTime() + 45 * 24 * 60 * 60 * 1000).toISOString(),
+                status: 'pending',
+                description: ''
               }
             ];
             
@@ -430,22 +421,20 @@ serve(async (req) => {
             details: pdfError.message,
             mockItems: [
               {
-                projectId,
-                task: "Site Preparation (Mock PDF Data)",
-                plannedStart: new Date().toISOString(),
-                plannedEnd: new Date(Date.now() + 10 * 24 * 60 * 60 * 1000).toISOString(),
-                actualStart: '',
-                actualEnd: '',
-                delayDays: 0
+                project_id: projectId,
+                title: "Site Preparation (Mock PDF Data)",
+                start_date: new Date().toISOString(),
+                end_date: new Date(Date.now() + 10 * 24 * 60 * 60 * 1000).toISOString(),
+                status: 'pending',
+                description: ''
               },
               {
-                projectId,
-                task: "Demolition (Mock PDF Data)",
-                plannedStart: new Date(Date.now() + 11 * 24 * 60 * 60 * 1000).toISOString(),
-                plannedEnd: new Date(Date.now() + 20 * 24 * 60 * 60 * 1000).toISOString(),
-                actualStart: '',
-                actualEnd: '',
-                delayDays: 0
+                project_id: projectId,
+                title: "Demolition (Mock PDF Data)",
+                start_date: new Date(Date.now() + 11 * 24 * 60 * 60 * 1000).toISOString(),
+                end_date: new Date(Date.now() + 20 * 24 * 60 * 60 * 1000).toISOString(),
+                status: 'pending',
+                description: ''
               }
             ]
           }),
@@ -510,13 +499,12 @@ serve(async (req) => {
             }
             
             return {
-              projectId,
-              task,
-              plannedStart: startDate.toISOString(),
-              plannedEnd: endDate.toISOString(),
-              actualStart: '',
-              actualEnd: '',
-              delayDays: 0
+              project_id: projectId,
+              title: task,
+              start_date: startDate.toISOString(),
+              end_date: endDate.toISOString(),
+              status: 'pending',
+              description: ''
             };
           } catch (e) {
             console.error("Error parsing CSV row:", e);
@@ -532,13 +520,78 @@ serve(async (req) => {
       );
     }
     
-    return new Response(
-      JSON.stringify({ 
-        items,
-        message: `Successfully parsed ${items.length} schedule items from the ${fileType} file.`
-      }),
-      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-    );
+    // Now insert the parsed items directly into the database
+    console.log(`Inserting ${items.length} items into the database`);
+    
+    if (items.length > 0) {
+      try {
+        // Insert items into the schedules table
+        const { data, error } = await supabase
+          .from('schedules')
+          .insert(items)
+          .select();
+        
+        if (error) {
+          console.error("Error inserting schedule items:", error);
+          return new Response(
+            JSON.stringify({ 
+              error: 'Failed to save schedule items to database',
+              details: error.message,
+              items: items // Return the items anyway so frontend can use them
+            }),
+            { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
+          );
+        }
+        
+        console.log(`Successfully inserted ${data.length} items into the database`);
+        
+        // Map the inserted data to the expected format for the frontend
+        const mappedData = data.map(item => ({
+          id: item.id,
+          projectId: item.project_id,
+          task: item.title,
+          plannedStart: item.start_date,
+          plannedEnd: item.end_date,
+          actualStart: '',
+          actualEnd: '',
+          delayDays: 0,
+          description: item.description || ''
+        }));
+        
+        return new Response(
+          JSON.stringify({ 
+            items: mappedData,
+            message: `Successfully parsed and saved ${mappedData.length} schedule items from the ${fileType} file.`
+          }),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      } catch (dbError) {
+        console.error("Database operation error:", dbError);
+        return new Response(
+          JSON.stringify({ 
+            error: 'Database operation failed',
+            details: dbError.message,
+            items: items.map(item => ({
+              id: crypto.randomUUID(),
+              projectId: item.project_id,
+              task: item.title,
+              plannedStart: item.start_date,
+              plannedEnd: item.end_date,
+              actualStart: '',
+              actualEnd: '',
+              delayDays: 0,
+              description: item.description || ''
+            }))
+          }),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
+        );
+      }
+    } else {
+      return new Response(
+        JSON.stringify({ error: 'No valid items could be extracted from the file' }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 }
+      );
+    }
     
   } catch (error) {
     console.error('Error processing file:', error);

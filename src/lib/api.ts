@@ -1,3 +1,4 @@
+
 import { supabase } from '@/integrations/supabase/client';
 import { Project, ScheduleItem, OrderItem, ResponsibilityItem } from '@/data/mockData';
 import { Database } from '@/integrations/supabase/types';
@@ -68,9 +69,9 @@ export const getScheduleItems = async (projectId: string) => {
       task: item.title, 
       plannedStart: item.start_date,
       plannedEnd: item.end_date,
-      actualStart: "",
-      actualEnd: "",
-      delayDays: 0,
+      actualStart: item.actual_start || "",
+      actualEnd: item.actual_end || "",
+      delayDays: item.delay_days || 0,
       description: item.description || ""
     }));
     
@@ -278,13 +279,16 @@ export const createProject = async (projectData: Omit<Project, 'id'>) => {
 // Create a schedule item
 export const createScheduleItem = async (itemData: Omit<ScheduleItem, 'id'>) => {
   try {
-    const { task, plannedStart, plannedEnd, projectId } = itemData;
+    const { task, plannedStart, plannedEnd, projectId, actualStart, actualEnd, delayDays } = itemData;
     
     const dbItem = {
       project_id: projectId,
       title: task,
       start_date: plannedStart,
       end_date: plannedEnd,
+      actual_start: actualStart || null,
+      actual_end: actualEnd || null,
+      delay_days: delayDays || 0,
       description: itemData.description || '',
       status: itemData.status || 'pending'
     };
@@ -310,9 +314,9 @@ export const createScheduleItem = async (itemData: Omit<ScheduleItem, 'id'>) => 
       task: data.title,
       plannedStart: data.start_date,
       plannedEnd: data.end_date,
-      actualStart: itemData.actualStart || '',
-      actualEnd: itemData.actualEnd || '',
-      delayDays: itemData.delayDays || 0,
+      actualStart: data.actual_start || '',
+      actualEnd: data.actual_end || '',
+      delayDays: data.delay_days || 0,
       description: data.description || ''
     } as ScheduleItem;
   } catch (error) {
@@ -328,6 +332,9 @@ export const updateScheduleItem = async (itemId: string, updates: Partial<Schedu
     if ('task' in updates) dbUpdates.title = updates.task;
     if ('plannedStart' in updates) dbUpdates.start_date = updates.plannedStart;
     if ('plannedEnd' in updates) dbUpdates.end_date = updates.plannedEnd;
+    if ('actualStart' in updates) dbUpdates.actual_start = updates.actualStart || null;
+    if ('actualEnd' in updates) dbUpdates.actual_end = updates.actualEnd || null;
+    if ('delayDays' in updates) dbUpdates.delay_days = updates.delayDays;
     if ('description' in updates) dbUpdates.description = updates.description;
     if ('status' in updates) dbUpdates.status = updates.status;
     
@@ -362,9 +369,9 @@ export const updateScheduleItem = async (itemId: string, updates: Partial<Schedu
       task: data.title,
       plannedStart: data.start_date,
       plannedEnd: data.end_date,
-      actualStart: updates.actualStart || '',
-      actualEnd: updates.actualEnd || '',
-      delayDays: updates.delayDays || 0,
+      actualStart: data.actual_start || '',
+      actualEnd: data.actual_end || '',
+      delayDays: data.delay_days || 0,
       description: data.description || ''
     } as ScheduleItem;
   } catch (error) {
@@ -530,6 +537,69 @@ export const initializeDatabase = async (mockData: {
         }
       }
       
+      // Also initialize schedules, orders and responsibilities if provided
+      if (mockData.schedules && mockData.schedules.length > 0) {
+        const dbSchedules = mockData.schedules.map(s => ({
+          project_id: s.projectId,
+          title: s.task,
+          start_date: s.plannedStart,
+          end_date: s.plannedEnd,
+          actual_start: s.actualStart || null,
+          actual_end: s.actualEnd || null,
+          delay_days: s.delayDays || 0,
+          description: s.description || '',
+          status: s.status || 'pending'
+        }));
+        
+        const { error } = await supabase
+          .from('schedules')
+          .insert(dbSchedules);
+          
+        if (error) {
+          console.error('Error inserting schedules:', error);
+        }
+      }
+      
+      if (mockData.orders && mockData.orders.length > 0) {
+        const dbOrders = mockData.orders.map(o => ({
+          project_id: o.projectId,
+          item_name: o.name,
+          quantity: o.quantity,
+          order_date: o.orderDate,
+          expected_delivery: o.expectedDelivery || null,
+          actual_delivery: o.actualDelivery || null,
+          status: o.status || 'pending',
+          notes: o.notes || ''
+        }));
+        
+        const { error } = await supabase
+          .from('orders')
+          .insert(dbOrders);
+          
+        if (error) {
+          console.error('Error inserting orders:', error);
+        }
+      }
+      
+      if (mockData.responsibilities && mockData.responsibilities.length > 0) {
+        const dbResponsibilities = mockData.responsibilities.map(r => ({
+          project_id: r.projectId,
+          task: r.task,
+          assigned_to: r.assignedTo,
+          due_date: r.dueDate || null,
+          status: r.status || 'pending',
+          notes: r.notes || ''
+        }));
+        
+        const { error } = await supabase
+          .from('responsibilities')
+          .insert(dbResponsibilities);
+          
+        if (error) {
+          console.error('Error inserting responsibilities:', error);
+        }
+      }
+      
       console.log('Successfully initialized projects');
     }
     
@@ -583,11 +653,7 @@ export const parseScheduleFile = async (projectId: string, file: File): Promise<
     
     const fileType = file.name.split('.').pop()?.toLowerCase();
     
-    if (fileType === 'csv') {
-      return await parseCSVFile(file, projectId);
-    }
-    
-    if (fileType === 'xlsx' || fileType === 'xls' || fileType === 'pdf' || fileType === 'csv') {
+    if (fileType === 'csv' || fileType === 'xlsx' || fileType === 'xls' || fileType === 'pdf') {
       try {
         console.log(`Calling parse-schedule-file function for ${fileType} file`);
         
@@ -600,9 +666,7 @@ export const parseScheduleFile = async (projectId: string, file: File): Promise<
         
         if (error) {
           console.error('Error invoking parse-schedule-file function:', error);
-          return fileType === 'xlsx' || fileType === 'xls' 
-            ? mockExcelParsing(projectId) 
-            : mockPDFParsing(projectId);
+          return { error: 'Failed to process file. Please try again.' };
         }
         
         if (data.error) {
@@ -624,9 +688,7 @@ export const parseScheduleFile = async (projectId: string, file: File): Promise<
         };
       } catch (error) {
         console.error('Error calling parse function:', error);
-        return fileType === 'xlsx' || fileType === 'xls' 
-          ? mockExcelParsing(projectId) 
-          : mockPDFParsing(projectId);
+        return { error: 'Failed to process file. Please try again.' };
       }
     }
     
@@ -635,140 +697,4 @@ export const parseScheduleFile = async (projectId: string, file: File): Promise<
     console.error('Error parsing schedule file:', error);
     return { error: "Failed to parse file" };
   }
-};
-
-// Parse CSV file
-const parseCSVFile = async (file: File, projectId: string) => {
-  return new Promise<{ items?: Omit<ScheduleItem, 'id'>[]; error?: string }>((resolve) => {
-    const reader = new FileReader();
-    
-    reader.onload = (e) => {
-      try {
-        const text = e.target?.result as string;
-        const lines = text.split('\n');
-        const headers = lines[0].split(',').map(header => header.trim().toLowerCase());
-        
-        const taskIndex = headers.findIndex(h => h.includes('task') || h.includes('activity') || h.includes('description'));
-        const startIndex = headers.findIndex(h => h.includes('start') || h.includes('begin'));
-        const endIndex = headers.findIndex(h => h.includes('end') || h.includes('finish'));
-        
-        if (taskIndex === -1 || startIndex === -1 || endIndex === -1) {
-          resolve({ error: "CSV file doesn't have required columns (task/activity, start date, end date)" });
-          return;
-        }
-        
-        const items: Omit<ScheduleItem, 'id'>[] = [];
-        
-        for (let i = 1; i < lines.length; i++) {
-          if (!lines[i].trim()) continue;
-          
-          const values = lines[i].split(',').map(val => val.trim());
-          
-          if (values.length < Math.max(taskIndex, startIndex, endIndex) + 1) continue;
-          
-          const task = values[taskIndex];
-          let startDate = values[startIndex];
-          let endDate = values[endIndex];
-          
-          try {
-            let parsedStart = new Date(startDate);
-            let parsedEnd = new Date(endDate);
-            
-            if (isNaN(parsedStart.getTime()) || isNaN(parsedEnd.getTime())) {
-              continue;
-            }
-            
-            items.push({
-              projectId,
-              task,
-              plannedStart: parsedStart.toISOString(),
-              plannedEnd: parsedEnd.toISOString(),
-              actualStart: '',
-              actualEnd: '',
-              delayDays: 0
-            });
-          } catch (e) {
-            console.error("Error parsing date:", e);
-            continue;
-          }
-        }
-        
-        if (items.length === 0) {
-          resolve({ error: "No valid schedule items found in the CSV file" });
-        } else {
-          resolve({ items });
-        }
-      } catch (error) {
-        console.error("Error parsing CSV:", error);
-        resolve({ error: "Failed to parse CSV file" });
-      }
-    };
-    
-    reader.onerror = () => {
-      resolve({ error: "Failed to read file" });
-    };
-    
-    reader.readAsText(file);
-  });
-};
-
-// Mock Excel parsing (for demo purposes)
-const mockExcelParsing = (projectId: string) => {
-  const mockItems: Omit<ScheduleItem, 'id'>[] = [
-    {
-      projectId,
-      task: "Foundation Work",
-      plannedStart: new Date().toISOString(),
-      plannedEnd: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString(),
-      actualStart: '',
-      actualEnd: '',
-      delayDays: 0
-    },
-    {
-      projectId,
-      task: "Framing",
-      plannedStart: new Date(Date.now() + 15 * 24 * 60 * 60 * 1000).toISOString(),
-      plannedEnd: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
-      actualStart: '',
-      actualEnd: '',
-      delayDays: 0
-    },
-    {
-      projectId,
-      task: "Electrical Installation",
-      plannedStart: new Date(Date.now() + 31 * 24 * 60 * 60 * 1000).toISOString(),
-      plannedEnd: new Date(Date.now() + 45 * 24 * 60 * 60 * 1000).toISOString(),
-      actualStart: '',
-      actualEnd: '',
-      delayDays: 0
-    }
-  ];
-  
-  return { items: mockItems };
-};
-
-// Mock PDF parsing (for demo purposes)
-const mockPDFParsing = (projectId: string) => {
-  const mockItems: Omit<ScheduleItem, 'id'>[] = [
-    {
-      projectId,
-      task: "Site Preparation",
-      plannedStart: new Date().toISOString(),
-      plannedEnd: new Date(Date.now() + 10 * 24 * 60 * 60 * 1000).toISOString(),
-      actualStart: '',
-      actualEnd: '',
-      delayDays: 0
-    },
-    {
-      projectId,
-      task: "Demolition",
-      plannedStart: new Date(Date.now() + 11 * 24 * 60 * 60 * 1000).toISOString(),
-      plannedEnd: new Date(Date.now() + 20 * 24 * 60 * 60 * 1000).toISOString(),
-      actualStart: '',
-      actualEnd: '',
-      delayDays: 0
-    }
-  ];
-  
-  return { items: mockItems };
 };
