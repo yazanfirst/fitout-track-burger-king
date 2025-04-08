@@ -1,11 +1,13 @@
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Download, File, FileText, Upload, X } from "lucide-react";
 import { Project } from "@/data/mockData";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Separator } from "@/components/ui/separator";
+import { supabase } from "@/integrations/supabase/client";
+import { useToast } from "@/hooks/use-toast";
 
 interface DrawingUploadProps {
   project: Project;
@@ -17,19 +19,142 @@ interface DrawingFile {
   size: string;
   uploadDate: string;
   type: string;
+  url?: string;
 }
 
 export function DrawingUpload({ project }: DrawingUploadProps) {
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
-  
-  // Mock drawing files
-  const drawingFiles: DrawingFile[] = [
-    { id: '1', name: 'Kitchen Layout Plan.pdf', size: '2.4 MB', uploadDate: '2023-05-15', type: 'pdf' },
-    { id: '2', name: 'Electrical Diagram.pdf', size: '1.8 MB', uploadDate: '2023-05-12', type: 'pdf' },
-    { id: '3', name: 'Floor Plan.pdf', size: '3.2 MB', uploadDate: '2023-05-10', type: 'pdf' },
-    { id: '4', name: 'Counter Details.dwg', size: '5.7 MB', uploadDate: '2023-05-08', type: 'dwg' },
-    { id: '5', name: 'HVAC Systems.pdf', size: '4.1 MB', uploadDate: '2023-05-05', type: 'pdf' },
-  ];
+  const [drawingFiles, setDrawingFiles] = useState<DrawingFile[]>([]);
+  const [isUploading, setIsUploading] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+  const { toast } = useToast();
+
+  useEffect(() => {
+    fetchDrawings();
+  }, [project.id]);
+
+  const fetchDrawings = async () => {
+    try {
+      setIsLoading(true);
+      
+      // First check if the bucket exists
+      const { data: buckets, error: bucketError } = await supabase
+        .storage
+        .listBuckets();
+      
+      console.log("Available buckets:", buckets);
+      
+      if (bucketError) {
+        console.error("Error fetching buckets:", bucketError);
+        toast({
+          title: "Error",
+          description: "Failed to check storage buckets",
+          variant: "destructive",
+        });
+        setIsLoading(false);
+        return;
+      }
+      
+      // Check if project_drawings bucket exists among available buckets
+      const bucketExists = buckets?.some(bucket => bucket.name === 'project_drawings');
+      
+      if (!bucketExists) {
+        console.error("project_drawings bucket does not exist");
+        toast({
+          title: "Storage Error",
+          description: "Drawing storage is not properly configured",
+          variant: "destructive",
+        });
+        setIsLoading(false);
+        
+        // Use mock data as fallback
+        setDrawingFiles([
+          { id: '1', name: 'Kitchen Layout Plan.pdf', size: '2.4 MB', uploadDate: '2023-05-15', type: 'pdf' },
+          { id: '2', name: 'Electrical Diagram.pdf', size: '1.8 MB', uploadDate: '2023-05-12', type: 'pdf' },
+          { id: '3', name: 'Floor Plan.pdf', size: '3.2 MB', uploadDate: '2023-05-10', type: 'pdf' },
+          { id: '4', name: 'Counter Details.dwg', size: '5.7 MB', uploadDate: '2023-05-08', type: 'dwg' },
+          { id: '5', name: 'HVAC Systems.pdf', size: '4.1 MB', uploadDate: '2023-05-05', type: 'pdf' },
+        ]);
+        return;
+      }
+
+      // Fetch drawings from Supabase storage
+      const projectPath = `${project.id}`;
+      const { data: files, error } = await supabase
+        .storage
+        .from('project_drawings')
+        .list(projectPath, {
+          sortBy: { column: 'created_at', order: 'desc' },
+        });
+
+      if (error) {
+        console.error("Error fetching drawings:", error);
+        toast({
+          title: "Error",
+          description: "Failed to load drawings",
+          variant: "destructive",
+        });
+        
+        // Use mock data as fallback
+        setDrawingFiles([
+          { id: '1', name: 'Kitchen Layout Plan.pdf', size: '2.4 MB', uploadDate: '2023-05-15', type: 'pdf' },
+          { id: '2', name: 'Electrical Diagram.pdf', size: '1.8 MB', uploadDate: '2023-05-12', type: 'pdf' },
+          { id: '3', name: 'Floor Plan.pdf', size: '3.2 MB', uploadDate: '2023-05-10', type: 'pdf' },
+          { id: '4', name: 'Counter Details.dwg', size: '5.7 MB', uploadDate: '2023-05-08', type: 'dwg' },
+          { id: '5', name: 'HVAC Systems.pdf', size: '4.1 MB', uploadDate: '2023-05-05', type: 'pdf' },
+        ]);
+      } else if (files && files.length > 0) {
+        // Transform the files data to match our DrawingFile interface
+        const formattedFiles = await Promise.all(files.map(async (file) => {
+          const fileExt = file.name.split('.').pop()?.toLowerCase() || '';
+          const { data: urlData } = supabase
+            .storage
+            .from('project_drawings')
+            .getPublicUrl(`${projectPath}/${file.name}`);
+            
+          return {
+            id: file.id,
+            name: file.name,
+            size: formatFileSize(file.metadata?.size || 0),
+            uploadDate: new Date(file.created_at || Date.now()).toISOString().split('T')[0],
+            type: fileExt,
+            url: urlData?.publicUrl
+          };
+        }));
+        
+        setDrawingFiles(formattedFiles);
+      } else {
+        // If no files found, use empty array
+        setDrawingFiles([]);
+      }
+    } catch (error) {
+      console.error("Error in fetchDrawings:", error);
+      toast({
+        title: "Error",
+        description: "An unexpected error occurred while fetching drawings",
+        variant: "destructive",
+      });
+      
+      // Use mock data as fallback
+      setDrawingFiles([
+        { id: '1', name: 'Kitchen Layout Plan.pdf', size: '2.4 MB', uploadDate: '2023-05-15', type: 'pdf' },
+        { id: '2', name: 'Electrical Diagram.pdf', size: '1.8 MB', uploadDate: '2023-05-12', type: 'pdf' },
+        { id: '3', name: 'Floor Plan.pdf', size: '3.2 MB', uploadDate: '2023-05-10', type: 'pdf' },
+        { id: '4', name: 'Counter Details.dwg', size: '5.7 MB', uploadDate: '2023-05-08', type: 'dwg' },
+        { id: '5', name: 'HVAC Systems.pdf', size: '4.1 MB', uploadDate: '2023-05-05', type: 'pdf' },
+      ]);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const formatFileSize = (bytes: number): string => {
+    if (bytes === 0) return '0 Bytes';
+    const k = 1024;
+    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
+  };
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files.length > 0) {
@@ -37,16 +162,99 @@ export function DrawingUpload({ project }: DrawingUploadProps) {
     }
   };
 
-  const handleUpload = () => {
-    // This would typically upload the drawings to a server
-    console.log("Uploading drawings:", selectedFiles);
+  const handleUpload = async () => {
+    if (selectedFiles.length === 0) return;
     
-    // Reset selected files
-    setSelectedFiles([]);
+    setIsUploading(true);
+    toast({
+      title: "Uploading",
+      description: `Uploading ${selectedFiles.length} drawing${selectedFiles.length > 1 ? 's' : ''}...`,
+    });
+
+    try {
+      const uploadedFiles: DrawingFile[] = [];
+      const projectPath = `${project.id}`;
+
+      // Upload each file
+      for (const file of selectedFiles) {
+        const fileExt = file.name.split('.').pop()?.toLowerCase();
+        const fileName = `${projectPath}/${Date.now()}-${file.name}`;
+        
+        const { data, error } = await supabase
+          .storage
+          .from('project_drawings')
+          .upload(fileName, file, {
+            cacheControl: '3600',
+            upsert: false
+          });
+          
+        if (error) {
+          console.error("Error uploading file:", error);
+          toast({
+            title: "Upload Failed",
+            description: `Failed to upload ${file.name}`,
+            variant: "destructive",
+          });
+        } else if (data) {
+          const { data: urlData } = supabase
+            .storage
+            .from('project_drawings')
+            .getPublicUrl(data.path);
+            
+          uploadedFiles.push({
+            id: data.id || Date.now().toString(),
+            name: file.name,
+            size: formatFileSize(file.size),
+            uploadDate: new Date().toISOString().split('T')[0],
+            type: fileExt || '',
+            url: urlData?.publicUrl
+          });
+        }
+      }
+
+      // Update the list with newly uploaded files
+      if (uploadedFiles.length > 0) {
+        setDrawingFiles(prev => [...uploadedFiles, ...prev]);
+        toast({
+          title: "Success",
+          description: `Successfully uploaded ${uploadedFiles.length} drawing${uploadedFiles.length > 1 ? 's' : ''}`,
+        });
+      }
+      
+      // Clear selected files
+      setSelectedFiles([]);
+    } catch (error) {
+      console.error("Error in upload process:", error);
+      toast({
+        title: "Upload Error",
+        description: "An unexpected error occurred during upload",
+        variant: "destructive",
+      });
+    } finally {
+      setIsUploading(false);
+    }
   };
 
   const removeFile = (index: number) => {
     setSelectedFiles(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const handleDownload = (file: DrawingFile) => {
+    if (file.url) {
+      // Create a temporary anchor element
+      const link = document.createElement('a');
+      link.href = file.url;
+      link.download = file.name;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    } else {
+      toast({
+        title: "Download Failed",
+        description: "File URL not available",
+        variant: "destructive",
+      });
+    }
   };
 
   const getFileIcon = (type: string) => {
@@ -80,17 +288,18 @@ export function DrawingUpload({ project }: DrawingUploadProps) {
                 <div className="flex items-center gap-2">
                   <Input
                     type="file"
-                    accept=".pdf,.dwg,.dxf"
+                    accept=".pdf,.dwg,.dxf,.jpg,.jpeg,.png"
                     multiple
                     onChange={handleFileSelect}
                     className="flex-1"
+                    disabled={isUploading}
                   />
                   <Button type="button" variant="outline" size="icon">
                     <Upload className="h-4 w-4" />
                   </Button>
                 </div>
                 <p className="mt-1 text-xs text-gray-500">
-                  Supported formats: PDF, DWG, DXF
+                  Supported formats: PDF, DWG, DXF, JPG, PNG
                 </p>
               </div>
               
@@ -110,6 +319,7 @@ export function DrawingUpload({ project }: DrawingUploadProps) {
                           type="button"
                           onClick={() => removeFile(index)}
                           className="text-red-500 hover:text-red-700 ml-2 flex-shrink-0"
+                          disabled={isUploading}
                         >
                           <X className="h-4 w-4" />
                         </button>
@@ -122,9 +332,9 @@ export function DrawingUpload({ project }: DrawingUploadProps) {
               <Button 
                 onClick={handleUpload} 
                 className="w-full" 
-                disabled={selectedFiles.length === 0}
+                disabled={selectedFiles.length === 0 || isUploading}
               >
-                Upload Drawings
+                {isUploading ? "Uploading..." : "Upload Drawings"}
               </Button>
             </div>
           </CardContent>
@@ -145,10 +355,14 @@ export function DrawingUpload({ project }: DrawingUploadProps) {
               
               <Separator />
               
-              {drawingFiles.length > 0 ? (
+              {isLoading ? (
+                <div className="py-8 flex justify-center items-center">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
+                </div>
+              ) : drawingFiles.length > 0 ? (
                 <div>
                   {drawingFiles.map((file, index) => (
-                    <div key={file.id}>
+                    <div key={file.id || index}>
                       <div className="grid grid-cols-12 items-center p-3 text-sm">
                         <div className="col-span-6 flex items-center gap-2">
                           {getFileIcon(file.type)}
@@ -159,7 +373,12 @@ export function DrawingUpload({ project }: DrawingUploadProps) {
                           {new Date(file.uploadDate).toLocaleDateString()}
                         </div>
                         <div className="col-span-1 flex justify-end">
-                          <Button variant="ghost" size="icon" className="h-8 w-8">
+                          <Button 
+                            variant="ghost" 
+                            size="icon" 
+                            className="h-8 w-8"
+                            onClick={() => handleDownload(file)}
+                          >
                             <Download className="h-4 w-4" />
                           </Button>
                         </div>
