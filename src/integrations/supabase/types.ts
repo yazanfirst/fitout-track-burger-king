@@ -9,43 +9,63 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
-      orders: {
+      drawings: {
         Row: {
-          actual_delivery: string | null
-          expected_delivery: string | null
+          drawing_name: string | null
+          file_url: string | null
           id: string
-          item_name: string
-          notes: string | null
-          order_date: string
-          project_id: string
-          quantity: number
-          status: string | null
+          project_id: string | null
+          uploaded_at: string | null
         }
         Insert: {
-          actual_delivery?: string | null
-          expected_delivery?: string | null
+          drawing_name?: string | null
+          file_url?: string | null
           id?: string
-          item_name: string
-          notes?: string | null
-          order_date?: string
-          project_id: string
-          quantity: number
-          status?: string | null
+          project_id?: string | null
+          uploaded_at?: string | null
         }
         Update: {
-          actual_delivery?: string | null
-          expected_delivery?: string | null
+          drawing_name?: string | null
+          file_url?: string | null
           id?: string
-          item_name?: string
-          notes?: string | null
-          order_date?: string
-          project_id?: string
-          quantity?: number
-          status?: string | null
+          project_id?: string | null
+          uploaded_at?: string | null
         }
         Relationships: [
           {
-            foreignKeyName: "orders_project_id_fkey"
+            foreignKeyName: "drawings_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      photos: {
+        Row: {
+          caption: string | null
+          file_url: string | null
+          id: string
+          project_id: string | null
+          uploaded_at: string | null
+        }
+        Insert: {
+          caption?: string | null
+          file_url?: string | null
+          id?: string
+          project_id?: string | null
+          uploaded_at?: string | null
+        }
+        Update: {
+          caption?: string | null
+          file_url?: string | null
+          id?: string
+          project_id?: string | null
+          uploaded_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "photos_project_id_fkey"
             columns: ["project_id"]
             isOneToOne: false
             referencedRelation: "projects"
@@ -55,77 +75,86 @@ export type Database = {
       }
       projects: {
         Row: {
-          budget: number | null
-          client: string | null
-          created_at: string
-          end_date: string | null
+          brand: string | null
+          contractor: string | null
+          contractor_progress: number | null
+          created_at: string | null
           id: string
           location: string | null
           name: string
           notes: string | null
-          start_date: string | null
-          status: string | null
-          updated_at: string
+          owner_progress: number | null
         }
         Insert: {
-          budget?: number | null
-          client?: string | null
-          created_at?: string
-          end_date?: string | null
+          brand?: string | null
+          contractor?: string | null
+          contractor_progress?: number | null
+          created_at?: string | null
           id?: string
           location?: string | null
           name: string
           notes?: string | null
-          start_date?: string | null
-          status?: string | null
-          updated_at?: string
+          owner_progress?: number | null
         }
         Update: {
-          budget?: number | null
-          client?: string | null
-          created_at?: string
-          end_date?: string | null
+          brand?: string | null
+          contractor?: string | null
+          contractor_progress?: number | null
+          created_at?: string | null
           id?: string
           location?: string | null
           name?: string
           notes?: string | null
-          start_date?: string | null
-          status?: string | null
-          updated_at?: string
+          owner_progress?: number | null
         }
         Relationships: []
       }
-      responsibilities: {
+      schedule_items: {
         Row: {
-          assigned_to: string
-          due_date: string | null
+          actual_end: string | null
+          actual_start: string | null
+          created_at: string | null
+          delay_days: number | null
           id: string
-          notes: string | null
-          project_id: string
+          owner_comment: string | null
+          planned_end: string | null
+          planned_start: string | null
+          project_id: string | null
+          responsible_party: string | null
           status: string | null
-          task: string
+          task: string | null
         }
         Insert: {
-          assigned_to: string
-          due_date?: string | null
+          actual_end?: string | null
+          actual_start?: string | null
+          created_at?: string | null
+          delay_days?: number | null
           id?: string
-          notes?: string | null
-          project_id: string
+          owner_comment?: string | null
+          planned_end?: string | null
+          planned_start?: string | null
+          project_id?: string | null
+          responsible_party?: string | null
           status?: string | null
-          task: string
+          task?: string | null
         }
         Update: {
-          assigned_to?: string
-          due_date?: string | null
+          actual_end?: string | null
+          actual_start?: string | null
+          created_at?: string | null
+          delay_days?: number | null
           id?: string
-          notes?: string | null
-          project_id?: string
+          owner_comment?: string | null
+          planned_end?: string | null
+          planned_start?: string | null
+          project_id?: string | null
+          responsible_party?: string | null
           status?: string | null
-          task?: string
+          task?: string | null
         }
         Relationships: [
           {
-            foreignKeyName: "responsibilities_project_id_fkey"
+            foreignKeyName: "schedule_items_project_id_fkey"
             columns: ["project_id"]
             isOneToOne: false
             referencedRelation: "projects"
@@ -135,40 +164,25 @@ export type Database = {
       }
       schedules: {
         Row: {
-          actual_end: string | null
-          actual_start: string | null
-          delay_days: number | null
-          description: string | null
-          end_date: string
+          file_name: string | null
+          file_url: string | null
           id: string
-          project_id: string
-          start_date: string
-          status: string | null
-          title: string
+          project_id: string | null
+          uploaded_at: string | null
         }
         Insert: {
-          actual_end?: string | null
-          actual_start?: string | null
-          delay_days?: number | null
-          description?: string | null
-          end_date: string
+          file_name?: string | null
+          file_url?: string | null
           id?: string
-          project_id: string
-          start_date: string
-          status?: string | null
-          title: string
+          project_id?: string | null
+          uploaded_at?: string | null
         }
         Update: {
-          actual_end?: string | null
-          actual_start?: string | null
-          delay_days?: number | null
-          description?: string | null
-          end_date?: string
+          file_name?: string | null
+          file_url?: string | null
           id?: string
-          project_id?: string
-          start_date?: string
-          status?: string | null
-          title?: string
+          project_id?: string | null
+          uploaded_at?: string | null
         }
         Relationships: [
           {
