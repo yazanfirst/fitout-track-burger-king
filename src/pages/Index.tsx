@@ -10,7 +10,7 @@ import { DrawingUpload } from "@/components/DrawingUpload";
 import { OrderTracker } from "@/components/OrderTracker";
 import { ResponsibilityMatrix } from "@/components/ResponsibilityMatrix";
 import { ReportGenerator } from "@/components/ReportGenerator";
-import { Project, projects, schedules, orders, responsibilities } from "@/data/mockData";
+import { Project } from "@/data/mockData";
 import { CreateProject } from "@/components/CreateProject";
 import { getProjects, getScheduleItems, getOrderItems, getResponsibilityItems, updateProject, initializeDatabase } from "@/lib/api";
 
@@ -24,11 +24,18 @@ const Index = () => {
   const [orderItems, setOrderItems] = useState<any[]>([]);
   const [responsibilityItems, setResponsibilityItems] = useState<any[]>([]);
 
-  // Initialize the database with mock data if empty
+  // Import mock data for initialization
   useEffect(() => {
     const initialize = async () => {
       try {
-        await initializeDatabase({ projects, schedules, orders, responsibilities });
+        const { projects, schedules, orders, responsibilities } = await import('@/data/mockData');
+        // Initialize the database
+        await initializeDatabase({ 
+          projects, 
+          schedules: Object.values(schedules), 
+          orders: Object.values(orders), 
+          responsibilities: Object.values(responsibilities)
+        });
         await fetchProjects();
       } catch (error) {
         console.error("Error during initialization:", error);
@@ -61,12 +68,14 @@ const Index = () => {
       });
       
       // Use mock data as fallback
+      const { projects, schedules, orders, responsibilities } = await import('@/data/mockData');
       setProjectsList(projects);
+      
       if (projects.length > 0) {
         setSelectedProject(projects[0]);
-        setScheduleItems(schedules.filter(item => item.projectId === projects[0].id));
-        setOrderItems(orders.filter(item => item.projectId === projects[0].id));
-        setResponsibilityItems(responsibilities.filter(item => item.projectId === projects[0].id));
+        setScheduleItems(Object.values(schedules).flat().filter(item => item.projectId === projects[0].id));
+        setOrderItems(Object.values(orders).flat().filter(item => item.projectId === projects[0].id));
+        setResponsibilityItems(Object.values(responsibilities).flat().filter(item => item.projectId === projects[0].id));
       }
     } finally {
       setIsLoading(false);

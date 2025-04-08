@@ -20,11 +20,13 @@ export const getScheduleItems = async (projectId: string) => {
   try {
     // Always return mock data for now
     const { schedules } = await import('@/data/mockData');
-    return schedules.filter(item => item.projectId === projectId);
+    // Fix: Access the array directly instead of treating schedules as a function
+    return Object.values(schedules).flat().filter(item => item.projectId === projectId);
   } catch (error) {
     console.error('Error fetching schedule items:', error);
     const { schedules } = await import('@/data/mockData');
-    return schedules.filter(item => item.projectId === projectId);
+    // Fix: Access the array directly instead of treating schedules as a function
+    return Object.values(schedules).flat().filter(item => item.projectId === projectId);
   }
 };
 
@@ -33,11 +35,13 @@ export const getOrderItems = async (projectId: string) => {
   try {
     // Always return mock data for now
     const { orders } = await import('@/data/mockData');
-    return orders.filter(item => item.projectId === projectId);
+    // Fix: Access the array directly
+    return Object.values(orders).flat().filter(item => item.projectId === projectId);
   } catch (error) {
     console.error('Error fetching order items:', error);
     const { orders } = await import('@/data/mockData');
-    return orders.filter(item => item.projectId === projectId);
+    // Fix: Access the array directly
+    return Object.values(orders).flat().filter(item => item.projectId === projectId);
   }
 };
 
@@ -46,11 +50,13 @@ export const getResponsibilityItems = async (projectId: string) => {
   try {
     // Always return mock data for now
     const { responsibilities } = await import('@/data/mockData');
-    return responsibilities.filter(item => item.projectId === projectId);
+    // Fix: Access the array directly
+    return Object.values(responsibilities).flat().filter(item => item.projectId === projectId);
   } catch (error) {
     console.error('Error fetching responsibility items:', error);
     const { responsibilities } = await import('@/data/mockData');
-    return responsibilities.filter(item => item.projectId === projectId);
+    // Fix: Access the array directly
+    return Object.values(responsibilities).flat().filter(item => item.projectId === projectId);
   }
 };
 
@@ -94,7 +100,6 @@ export const createProject = async (projectData: Omit<Project, 'id'>) => {
 export const createScheduleItem = async (itemData: Omit<ScheduleItem, 'id'>) => {
   try {
     // Create in mock data
-    const { schedules } = await import('@/data/mockData');
     const newItem = {
       ...itemData,
       id: `s-${Date.now()}`, // Generate a unique ID
@@ -110,16 +115,23 @@ export const createScheduleItem = async (itemData: Omit<ScheduleItem, 'id'>) => 
 // Update a schedule item
 export const updateScheduleItem = async (itemId: string, updates: Partial<ScheduleItem>) => {
   try {
-    // Update mock data
+    // Import mock data
     const { schedules } = await import('@/data/mockData');
-    const itemIndex = schedules.findIndex(item => item.id === itemId);
     
-    if (itemIndex !== -1) {
-      const updatedItem = { ...schedules[itemIndex], ...updates };
-      // Note: This won't persist between refreshes
-      return updatedItem;
-    }
-    return null;
+    // Find the item to update across all project schedules
+    let updatedItem: ScheduleItem | null = null;
+    
+    // Process each project's schedule items
+    Object.keys(schedules).forEach(projectId => {
+      const items = schedules[projectId];
+      const itemIndex = items.findIndex((item: ScheduleItem) => item.id === itemId);
+      
+      if (itemIndex !== -1) {
+        updatedItem = { ...items[itemIndex], ...updates };
+      }
+    });
+    
+    return updatedItem;
   } catch (error) {
     console.error('Error updating schedule item:', error);
     return null;
