@@ -1,5 +1,4 @@
-
-import { useState, useEffect } from "react";
+import React, { useState, useEffect } from "react";
 import { Plus, Check, AlertCircle } from "lucide-react";
 import { Project, ResponsibilityItem } from "@/data/mockData";
 import { Button } from "@/components/ui/button";
@@ -73,7 +72,6 @@ export function ResponsibilityMatrix({ project, responsibilities: initialRespons
   const [isLoading, setIsLoading] = useState(false);
   const { toast } = useToast();
 
-  // Fetch responsibilities from the database
   useEffect(() => {
     fetchResponsibilities();
   }, [project.id]);
@@ -95,8 +93,7 @@ export function ResponsibilityMatrix({ project, responsibilities: initialRespons
         });
         setResponsibilities(initialResponsibilities || []);
       } else {
-        // Transform the data to match our ResponsibilityItem interface
-        const formattedItems = data.map(item => ({
+        const formattedItems: ResponsibilityItem[] = data.map(item => ({
           id: item.id,
           projectId: item.project_id,
           task: item.task || '',
@@ -104,6 +101,7 @@ export function ResponsibilityMatrix({ project, responsibilities: initialRespons
           dueDate: item.due_date || '',
           status: item.status || 'pending',
           notes: item.notes || '',
+          responsibleParty: item.responsible_party || '',
         }));
         
         setResponsibilities(formattedItems);
@@ -147,7 +145,6 @@ export function ResponsibilityMatrix({ project, responsibilities: initialRespons
     }
     
     try {
-      // Insert into database
       const { data, error } = await supabase
         .from('responsibilities')
         .insert({
@@ -157,6 +154,7 @@ export function ResponsibilityMatrix({ project, responsibilities: initialRespons
           due_date: formData.dueDate.toISOString().split('T')[0],
           status: formData.status,
           notes: formData.notes,
+          responsible_party: formData.assignedTo,
         })
         .select()
         .single();
@@ -171,8 +169,7 @@ export function ResponsibilityMatrix({ project, responsibilities: initialRespons
         return;
       }
       
-      // Add new responsibility to the list
-      const newItem = {
+      const newItem: ResponsibilityItem = {
         id: data.id,
         projectId: data.project_id,
         task: data.task,
@@ -180,6 +177,7 @@ export function ResponsibilityMatrix({ project, responsibilities: initialRespons
         dueDate: data.due_date,
         status: data.status,
         notes: data.notes,
+        responsibleParty: data.responsible_party,
       };
       
       setResponsibilities(prev => [newItem, ...prev]);
@@ -189,7 +187,6 @@ export function ResponsibilityMatrix({ project, responsibilities: initialRespons
         description: "Responsibility has been added",
       });
       
-      // Reset form and close dialog
       setFormData(initialFormData);
       setIsDialogOpen(false);
       
@@ -205,7 +202,6 @@ export function ResponsibilityMatrix({ project, responsibilities: initialRespons
   
   const updateResponsibilityStatus = async (itemId: string, newStatus: string) => {
     try {
-      // Update in database
       const { error } = await supabase
         .from('responsibilities')
         .update({
@@ -224,7 +220,6 @@ export function ResponsibilityMatrix({ project, responsibilities: initialRespons
         return;
       }
       
-      // Update local state
       setResponsibilities(prev => 
         prev.map(item => 
           item.id === itemId ? { ...item, status: newStatus } : item
