@@ -5,24 +5,24 @@ import { Database } from '@/integrations/supabase/types';
 // Ensure storage buckets exist
 export const ensureStorageBucketsExist = async () => {
   try {
-    // Check if project_files bucket exists
+    // Check if project-files bucket exists
     const { data: projectFilesBucket, error: projectFilesError } = await supabase
       .storage
-      .getBucket('project_files');
+      .getBucket('project-files');
     
-    // Create project_files bucket if it doesn't exist
+    // Create project-files bucket if it doesn't exist
     if (projectFilesError && projectFilesError.message.includes('not found')) {
       const { data, error } = await supabase
         .storage
-        .createBucket('project_files', {
+        .createBucket('project-files', {
           public: true, // Make bucket publicly accessible
           fileSizeLimit: 50 * 1024 * 1024, // 50MB limit per file
         });
       
       if (error) {
-        console.error('Error creating project_files bucket:', error);
+        console.error('Error creating project-files bucket:', error);
       } else {
-        console.log('Created project_files bucket successfully');
+        console.log('Created project-files bucket successfully');
       }
     }
     
@@ -505,7 +505,7 @@ export const uploadFile = async (file: File, projectId: string, type: 'drawing' 
     
     const { data, error } = await supabase
       .storage
-      .from('project_files')
+      .from('project-files')
       .upload(fileName, file);
       
     if (error) {
@@ -515,7 +515,7 @@ export const uploadFile = async (file: File, projectId: string, type: 'drawing' 
     
     const { data: urlData } = supabase
       .storage
-      .from('project_files')
+      .from('project-files')
       .getPublicUrl(fileName);
       
     return urlData?.publicUrl;
@@ -535,7 +535,7 @@ export const getProjectFiles = async (projectId: string, type?: 'drawing' | 'pho
     
     const { data, error } = await supabase
       .storage
-      .from('project_files')
+      .from('project-files')
       .list(path);
       
     if (error) {
@@ -675,7 +675,7 @@ export const uploadScheduleFile = async (projectId: string, file: File) => {
     // Ensure storage buckets exist
     await ensureStorageBucketsExist();
     
-    // Try uploading to project_files first
+    // Try uploading to project-files first
     const fileExt = file.name.split('.').pop()?.toLowerCase();
     const fileName = `${projectId}/schedules/schedule_${Date.now()}.${fileExt}`;
     
@@ -687,9 +687,9 @@ export const uploadScheduleFile = async (projectId: string, file: File) => {
       });
       
     if (error) {
-      console.error('Error uploading schedule file to project_files:', error);
+      console.error('Error uploading schedule file to project-files:', error);
       
-      // Try uploading to schedule-pdfs if project_files fails
+      // Try uploading to schedule-pdfs if project-files fails
       const pdfFileName = `${projectId}/schedule_${Date.now()}.${fileExt}`;
       
       const { data: pdfData, error: pdfError } = await supabase
@@ -714,7 +714,7 @@ export const uploadScheduleFile = async (projectId: string, file: File) => {
     
     const { data: urlData } = supabase
       .storage
-      .from('project_files')
+      .from('project-files')
       .getPublicUrl(fileName);
       
     return urlData?.publicUrl;
