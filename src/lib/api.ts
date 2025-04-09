@@ -681,7 +681,7 @@ export const uploadScheduleFile = async (projectId: string, file: File) => {
     
     const { data, error } = await supabase
       .storage
-      .from('project_files')
+      .from('project-files')
       .upload(fileName, file, {
         upsert: true // Add upsert option to overwrite if same name exists
       });
