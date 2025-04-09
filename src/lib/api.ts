@@ -4,8 +4,30 @@ import { Project, ScheduleItem, ResponsibilityItem } from "@/data/mockData";
 // Ensure storage buckets exist
 export const ensureStorageBucketsExist = async () => {
   try {
-    // Since buckets are already created, we can remove bucket creation logic
-    return true;
+    // Check if buckets exist, based on the screenshots
+    const { data: buckets } = await supabase.storage.listBuckets();
+    
+    const requiredBuckets = [
+      'project_drawings',
+      'project_photos', 
+      'project_documents',
+      'project_reports',
+      'lpo_documents',
+      'invoice_documents',
+      'project-files'
+    ];
+    
+    // Check which buckets are missing
+    const missingBuckets = requiredBuckets.filter(
+      bucket => !buckets?.some(b => b.name === bucket)
+    );
+    
+    if (missingBuckets.length === 0) {
+      return true;
+    }
+    
+    console.warn("Missing storage buckets:", missingBuckets);
+    return false;
   } catch (error) {
     console.error('Error ensuring storage buckets exist:', error);
     return false;
@@ -49,7 +71,7 @@ export const uploadScheduleFile = async (projectId: string, file: File) => {
     
     const { data, error } = await supabase
       .storage
-      .from('project_files')
+      .from('project-files')
       .upload(fileName, file, {
         upsert: true
       });
@@ -61,7 +83,7 @@ export const uploadScheduleFile = async (projectId: string, file: File) => {
     
     const { data: urlData } = supabase
       .storage
-      .from('project_files')
+      .from('project-files')
       .getPublicUrl(fileName);
       
     return urlData?.publicUrl;
@@ -73,7 +95,7 @@ export const uploadScheduleFile = async (projectId: string, file: File) => {
 
 export const getProjectFiles = async (projectId: string, type?: 'drawing' | 'photo') => {
   try {
-    let bucket = 'project_files';
+    let bucket = 'project-files';
     let path = `${projectId}`;
     
     if (type === 'drawing') {
@@ -99,9 +121,6 @@ export const getProjectFiles = async (projectId: string, type?: 'drawing' | 'pho
   }
 };
 
-// New functions that need to be implemented to fix the build errors
-
-// Create a new project
 export const createProject = async (projectData: Omit<Project, 'id'>) => {
   try {
     const { data, error } = await supabase
@@ -122,7 +141,6 @@ export const createProject = async (projectData: Omit<Project, 'id'>) => {
   }
 };
 
-// Update a project
 export const updateProject = async (id: string, projectData: Partial<Project>) => {
   try {
     const { data, error } = await supabase
@@ -144,7 +162,6 @@ export const updateProject = async (id: string, projectData: Partial<Project>) =
   }
 };
 
-// Delete a project
 export const deleteProject = async (id: string) => {
   try {
     const { error } = await supabase
@@ -164,7 +181,6 @@ export const deleteProject = async (id: string) => {
   }
 };
 
-// Get all projects
 export const getProjects = async () => {
   try {
     const { data, error } = await supabase
@@ -184,10 +200,8 @@ export const getProjects = async () => {
   }
 };
 
-// Create a schedule item
 export const createScheduleItem = async (itemData: Omit<ScheduleItem, 'id'>) => {
   try {
-    // Convert to database format
     const dbItem = {
       project_id: itemData.projectId,
       task: itemData.task,
@@ -210,7 +224,6 @@ export const createScheduleItem = async (itemData: Omit<ScheduleItem, 'id'>) => 
       return null;
     }
     
-    // Convert back to app format
     return {
       id: data.id,
       projectId: data.project_id,
@@ -228,10 +241,8 @@ export const createScheduleItem = async (itemData: Omit<ScheduleItem, 'id'>) => 
   }
 };
 
-// Update a schedule item
 export const updateScheduleItem = async (id: string, itemData: Partial<ScheduleItem>) => {
   try {
-    // Convert to database format
     const dbItem: any = {};
     if (itemData.task) dbItem.task = itemData.task;
     if (itemData.plannedStart) dbItem.planned_start = itemData.plannedStart;
@@ -253,7 +264,6 @@ export const updateScheduleItem = async (id: string, itemData: Partial<ScheduleI
       return null;
     }
     
-    // Convert back to app format
     return {
       id: data.id,
       projectId: data.project_id,
@@ -271,7 +281,6 @@ export const updateScheduleItem = async (id: string, itemData: Partial<ScheduleI
   }
 };
 
-// Delete a schedule item
 export const deleteScheduleItem = async (id: string) => {
   try {
     const { error } = await supabase
@@ -291,7 +300,6 @@ export const deleteScheduleItem = async (id: string) => {
   }
 };
 
-// Get schedule items for a project
 export const getScheduleItems = async (projectId: string) => {
   try {
     const { data, error } = await supabase
@@ -305,7 +313,6 @@ export const getScheduleItems = async (projectId: string) => {
       return [];
     }
     
-    // Convert from database format to app format
     return data.map(item => ({
       id: item.id,
       projectId: item.project_id,
@@ -323,22 +330,14 @@ export const getScheduleItems = async (projectId: string) => {
   }
 };
 
-// Parse a schedule file (CSV, Excel, PDF)
 export const parseScheduleFile = async (projectId: string, file: File) => {
   try {
-    // Upload the file first
     const fileUrl = await uploadScheduleFile(projectId, file);
     
     if (!fileUrl) {
       return { error: "Failed to upload file", items: [] };
     }
     
-    // For now, we'll implement a simplified parser with mock data
-    // In a real implementation, you would either:
-    // 1. Parse the file client-side (for CSV or simple Excel)
-    // 2. Send to a serverless function for processing (for complex parsing)
-    
-    // We'll simulate a successful parsing with some fake data
     const fileExt = file.name.split('.').pop()?.toLowerCase();
     
     if (fileExt === 'pdf') {
@@ -349,14 +348,12 @@ export const parseScheduleFile = async (projectId: string, file: File) => {
       };
     }
     
-    // Mock parsing results - in reality, this would come from actually parsing the file
-    // Ensure all required fields are included, especially delayDays
     const mockItems = [
       {
         projectId,
         task: `Task from ${file.name} - 1`,
         plannedStart: new Date().toISOString(),
-        plannedEnd: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString(), // 14 days from now
+        plannedEnd: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString(),
         description: "Automatically parsed from imported file",
         actualStart: "",
         actualEnd: "",
@@ -365,8 +362,8 @@ export const parseScheduleFile = async (projectId: string, file: File) => {
       {
         projectId,
         task: `Task from ${file.name} - 2`,
-        plannedStart: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(), // 7 days from now
-        plannedEnd: new Date(Date.now() + 21 * 24 * 60 * 60 * 1000).toISOString(), // 21 days from now
+        plannedStart: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+        plannedEnd: new Date(Date.now() + 21 * 24 * 60 * 60 * 1000).toISOString(),
         description: "Automatically parsed from imported file",
         actualStart: "",
         actualEnd: "",
@@ -385,7 +382,6 @@ export const parseScheduleFile = async (projectId: string, file: File) => {
   }
 };
 
-// Get all order items for a project
 export const getOrderItems = async (projectId: string) => {
   try {
     const { data, error } = await supabase
@@ -399,7 +395,6 @@ export const getOrderItems = async (projectId: string) => {
       return [];
     }
     
-    // Convert from database format to app format
     return data.map(item => ({
       id: item.id,
       projectId: item.project_id,
@@ -430,7 +425,6 @@ export const getOrderItems = async (projectId: string) => {
   }
 };
 
-// Update responsibility status
 export const updateResponsibilityStatus = async (id: string, status: string, completionNotes?: string) => {
   try {
     const updates: any = { 
@@ -438,14 +432,12 @@ export const updateResponsibilityStatus = async (id: string, status: string, com
       last_updated: new Date().toISOString()
     };
     
-    // Add completion info if status is completed
     if (status === 'completed') {
       updates.completed_at = new Date().toISOString();
       if (completionNotes) {
         updates.completion_notes = completionNotes;
       }
     } else {
-      // Clear completion info if not completed
       updates.completed_at = null;
     }
 
@@ -468,7 +460,6 @@ export const updateResponsibilityStatus = async (id: string, status: string, com
   }
 };
 
-// Get all responsibility items for a project
 export const getResponsibilityItems = async (projectId: string) => {
   try {
     const { data, error } = await supabase
@@ -482,7 +473,6 @@ export const getResponsibilityItems = async (projectId: string) => {
       return [];
     }
     
-    // Convert from database format to app format
     return data.map(item => ({
       id: item.id,
       projectId: item.project_id,
@@ -503,10 +493,8 @@ export const getResponsibilityItems = async (projectId: string) => {
   }
 };
 
-// Initialize database with default data if needed
 export const initializeDatabase = async () => {
   try {
-    // Check if we have any projects
     const { data: projects, error: projectsError } = await supabase
       .from('projects')
       .select('id')
@@ -517,12 +505,10 @@ export const initializeDatabase = async () => {
       return false;
     }
     
-    // If we already have projects, no need to initialize
     if (projects && projects.length > 0) {
       return true;
     }
     
-    // Otherwise, create sample project data
     const sampleProject = {
       name: 'Sample Project',
       location: 'Sample Location',
@@ -533,7 +519,7 @@ export const initializeDatabase = async () => {
       owner_progress: 50,
       budget: 100000,
       start_date: new Date().toISOString(),
-      end_date: new Date(Date.now() + 90 * 24 * 60 * 60 * 1000).toISOString() // 90 days from now
+      end_date: new Date(Date.now() + 90 * 24 * 60 * 60 * 1000).toISOString()
     };
     
     const { data: createdProject, error: createError } = await supabase

@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Download, File, FileText, Upload, X } from "lucide-react";
 import { Project } from "@/data/mockData";
@@ -37,7 +36,6 @@ export function DrawingUpload({ project }: DrawingUploadProps) {
     try {
       setIsLoading(true);
       
-      // First check if the bucket exists
       const { data: buckets, error: bucketError } = await supabase
         .storage
         .listBuckets();
@@ -55,7 +53,6 @@ export function DrawingUpload({ project }: DrawingUploadProps) {
         return;
       }
       
-      // Check if project_drawings bucket exists among available buckets
       const bucketExists = buckets?.some(bucket => bucket.name === 'project_drawings');
       
       if (!bucketExists) {
@@ -67,7 +64,6 @@ export function DrawingUpload({ project }: DrawingUploadProps) {
         });
         setIsLoading(false);
         
-        // Use mock data as fallback
         setDrawingFiles([
           { id: '1', name: 'Kitchen Layout Plan.pdf', size: '2.4 MB', uploadDate: '2023-05-15', type: 'pdf' },
           { id: '2', name: 'Electrical Diagram.pdf', size: '1.8 MB', uploadDate: '2023-05-12', type: 'pdf' },
@@ -78,7 +74,6 @@ export function DrawingUpload({ project }: DrawingUploadProps) {
         return;
       }
 
-      // Fetch drawings from Supabase storage
       const projectPath = `${project.id}`;
       const { data: files, error } = await supabase
         .storage
@@ -95,7 +90,6 @@ export function DrawingUpload({ project }: DrawingUploadProps) {
           variant: "destructive",
         });
         
-        // Use mock data as fallback
         setDrawingFiles([
           { id: '1', name: 'Kitchen Layout Plan.pdf', size: '2.4 MB', uploadDate: '2023-05-15', type: 'pdf' },
           { id: '2', name: 'Electrical Diagram.pdf', size: '1.8 MB', uploadDate: '2023-05-12', type: 'pdf' },
@@ -104,7 +98,6 @@ export function DrawingUpload({ project }: DrawingUploadProps) {
           { id: '5', name: 'HVAC Systems.pdf', size: '4.1 MB', uploadDate: '2023-05-05', type: 'pdf' },
         ]);
       } else if (files && files.length > 0) {
-        // Transform the files data to match our DrawingFile interface
         const formattedFiles = await Promise.all(files.map(async (file) => {
           const fileExt = file.name.split('.').pop()?.toLowerCase() || '';
           const { data: urlData } = supabase
@@ -124,7 +117,6 @@ export function DrawingUpload({ project }: DrawingUploadProps) {
         
         setDrawingFiles(formattedFiles);
       } else {
-        // If no files found, use empty array
         setDrawingFiles([]);
       }
     } catch (error) {
@@ -135,7 +127,6 @@ export function DrawingUpload({ project }: DrawingUploadProps) {
         variant: "destructive",
       });
       
-      // Use mock data as fallback
       setDrawingFiles([
         { id: '1', name: 'Kitchen Layout Plan.pdf', size: '2.4 MB', uploadDate: '2023-05-15', type: 'pdf' },
         { id: '2', name: 'Electrical Diagram.pdf', size: '1.8 MB', uploadDate: '2023-05-12', type: 'pdf' },
@@ -175,7 +166,6 @@ export function DrawingUpload({ project }: DrawingUploadProps) {
       const uploadedFiles: DrawingFile[] = [];
       const projectPath = `${project.id}`;
 
-      // Upload each file
       for (const file of selectedFiles) {
         const fileExt = file.name.split('.').pop()?.toLowerCase();
         const fileName = `${projectPath}/${Date.now()}-${file.name}`;
@@ -212,7 +202,6 @@ export function DrawingUpload({ project }: DrawingUploadProps) {
         }
       }
 
-      // Update the list with newly uploaded files
       if (uploadedFiles.length > 0) {
         setDrawingFiles(prev => [...uploadedFiles, ...prev]);
         toast({
@@ -221,7 +210,6 @@ export function DrawingUpload({ project }: DrawingUploadProps) {
         });
       }
       
-      // Clear selected files
       setSelectedFiles([]);
     } catch (error) {
       console.error("Error in upload process:", error);
@@ -241,7 +229,6 @@ export function DrawingUpload({ project }: DrawingUploadProps) {
 
   const handleDownload = (file: DrawingFile) => {
     if (file.url) {
-      // Create a temporary anchor element
       const link = document.createElement('a');
       link.href = file.url;
       link.download = file.name;

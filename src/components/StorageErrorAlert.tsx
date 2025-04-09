@@ -22,7 +22,17 @@ export function StorageErrorAlert({ message = "Drawing storage is not properly c
           return;
         }
         
-        const requiredBuckets = ['project_drawings', 'project_photos', 'project_files'];
+        // Update required buckets based on screenshots
+        const requiredBuckets = [
+          'project_drawings',
+          'project_photos', 
+          'project_documents',
+          'project_reports',
+          'lpo_documents',
+          'invoice_documents',
+          'project-files'
+        ];
+        
         const bucketExists: Record<string, boolean> = {};
         
         requiredBuckets.forEach(bucket => {
