@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { Sidebar } from "@/components/Sidebar";
@@ -40,12 +39,7 @@ const Index = () => {
     const initialize = async () => {
       try {
         const { projects, schedules, orders, responsibilities } = await import('@/data/mockData');
-        await initializeDatabase({ 
-          projects, 
-          schedules: Object.values(schedules), 
-          orders: Object.values(orders), 
-          responsibilities: Object.values(responsibilities)
-        });
+        await initializeDatabase();
         await fetchProjects();
       } catch (error) {
         console.error("Error during initialization:", error);

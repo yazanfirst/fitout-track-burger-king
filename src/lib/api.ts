@@ -1,5 +1,5 @@
 import { supabase } from "@/integrations/supabase/client";
-import { Project, ScheduleItem, Order, ResponsibilityItem } from "@/data/mockData";
+import { Project, ScheduleItem, ResponsibilityItem } from "@/data/mockData";
 
 // Ensure storage buckets exist
 export const ensureStorageBucketsExist = async () => {
@@ -350,20 +350,27 @@ export const parseScheduleFile = async (projectId: string, file: File) => {
     }
     
     // Mock parsing results - in reality, this would come from actually parsing the file
+    // Ensure all required fields are included, especially delayDays
     const mockItems = [
       {
         projectId,
         task: `Task from ${file.name} - 1`,
         plannedStart: new Date().toISOString(),
         plannedEnd: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString(), // 14 days from now
-        description: "Automatically parsed from imported file"
+        description: "Automatically parsed from imported file",
+        actualStart: "",
+        actualEnd: "",
+        delayDays: 0
       },
       {
         projectId,
         task: `Task from ${file.name} - 2`,
         plannedStart: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(), // 7 days from now
         plannedEnd: new Date(Date.now() + 21 * 24 * 60 * 60 * 1000).toISOString(), // 21 days from now
-        description: "Automatically parsed from imported file"
+        description: "Automatically parsed from imported file",
+        actualStart: "",
+        actualEnd: "",
+        delayDays: 0
       }
     ];
     
@@ -416,7 +423,7 @@ export const getOrderItems = async (projectId: string) => {
       invoiceStatus: item.invoice_status || '0%',
       ordered: item.ordered || false,
       notes: item.notes || ''
-    })) as Order[];
+    })) as any[];
   } catch (error) {
     console.error('Error getting order items:', error);
     return [];

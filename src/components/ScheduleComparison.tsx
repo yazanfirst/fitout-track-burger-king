@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -55,8 +54,7 @@ export function ScheduleComparison({ project, scheduleItems, onScheduleUpdate }:
     show: boolean;
     message: string;
   }>({ show: false, message: "" });
-  
-  // Ensure storage buckets exist on component load
+
   useEffect(() => {
     ensureStorageBucketsExist()
       .then(success => {
@@ -79,7 +77,6 @@ export function ScheduleComparison({ project, scheduleItems, onScheduleUpdate }:
       });
   }, []);
 
-  // Reset new item form when project changes
   useEffect(() => {
     setNewItem({
       projectId: project.id,
@@ -93,7 +90,6 @@ export function ScheduleComparison({ project, scheduleItems, onScheduleUpdate }:
     });
   }, [project.id]);
 
-  // Graph data transformation
   const graphData = scheduleItems.map(item => ({
     name: item.task,
     planned: differenceInCalendarDays(
@@ -107,7 +103,6 @@ export function ScheduleComparison({ project, scheduleItems, onScheduleUpdate }:
       ) : 0
   }));
 
-  // Handle file selection
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!e.target.files || e.target.files.length === 0) {
       setSelectedFile(null);
@@ -126,31 +121,25 @@ export function ScheduleComparison({ project, scheduleItems, onScheduleUpdate }:
     setPdfUrl(null);
     setShowPdfViewer(false);
     
-    // Check file type
     const fileExt = file.name.split('.').pop()?.toLowerCase();
     if (!fileExt || !['csv', 'xlsx', 'xls', 'pdf'].includes(fileExt)) {
       setFileParseError("Unsupported file format. Please upload CSV, Excel, or PDF files.");
       return;
     }
     
-    // Handle PDF files separately
     if (fileExt === 'pdf') {
       handlePdfUpload(file);
     } else {
-      // Auto-trigger file parsing when file is selected for Excel/CSV
       handleFileUpload(file);
     }
   };
 
-  // Handle PDF upload
   const handlePdfUpload = async (file: File) => {
     setUploadLoading(true);
     
     try {
-      // Ensure storage buckets exist first
       await ensureStorageBucketsExist();
       
-      // Upload PDF to Supabase storage (first try schedule-pdfs bucket)
       const fileName = `${project.id}/pdf_${Date.now()}_${file.name}`;
       let { data, error } = await supabase
         .storage
@@ -160,7 +149,6 @@ export function ScheduleComparison({ project, scheduleItems, onScheduleUpdate }:
           contentType: 'application/pdf'
         });
       
-      // If schedule-pdfs bucket fails, try project_files bucket
       if (error) {
         console.error("Error uploading to schedule-pdfs bucket:", error);
         const alternativeFileName = `${project.id}/schedules/pdf_${Date.now()}_${file.name}`;
@@ -183,7 +171,6 @@ export function ScheduleComparison({ project, scheduleItems, onScheduleUpdate }:
           throw new Error(`Error uploading PDF: ${error.message}`);
         }
         
-        // Get public URL from project_files bucket
         const { data: urlData } = supabase
           .storage
           .from('project_files')
@@ -195,7 +182,6 @@ export function ScheduleComparison({ project, scheduleItems, onScheduleUpdate }:
         
         setPdfUrl(urlData.publicUrl);
       } else {
-        // Get public URL from schedule-pdfs bucket
         const { data: urlData } = supabase
           .storage
           .from('schedule-pdfs')
@@ -208,7 +194,6 @@ export function ScheduleComparison({ project, scheduleItems, onScheduleUpdate }:
         setPdfUrl(urlData.publicUrl);
       }
       
-      // Save metadata to schedules table
       const { error: insertError } = await supabase
         .from('schedules')
         .insert({
@@ -227,7 +212,6 @@ export function ScheduleComparison({ project, scheduleItems, onScheduleUpdate }:
         console.error("Error saving PDF metadata:", insertError);
       }
       
-      // Show PDF viewer
       setShowPdfViewer(true);
       setImportSuccessful(true);
       setStorageAlert({ show: false, message: "" });
@@ -245,7 +229,6 @@ export function ScheduleComparison({ project, scheduleItems, onScheduleUpdate }:
     }
   };
 
-  // Handle file upload and parsing for Excel/CSV
   const handleFileUpload = async (file?: File) => {
     const fileToUpload = file || selectedFile;
     if (!fileToUpload) return;
@@ -256,16 +239,19 @@ export function ScheduleComparison({ project, scheduleItems, onScheduleUpdate }:
     setShowPdfViewer(false);
 
     try {
-      // Ensure storage buckets exist first
       await ensureStorageBucketsExist();
       
-      // Upload and parse file
       const result = await parseScheduleFile(project.id, fileToUpload);
       
       if (result.error) {
         setFileParseError(result.error);
       } else if (result.items && result.items.length > 0) {
-        setParsedItems(result.items);
+        setParsedItems(result.items.map(item => ({
+          ...item,
+          actualStart: item.actualStart || "",
+          actualEnd: item.actualEnd || "",
+          delayDays: item.delayDays || 0,
+        })));
         setImportSuccessful(true);
         setStorageAlert({ show: false, message: "" });
         
@@ -274,7 +260,6 @@ export function ScheduleComparison({ project, scheduleItems, onScheduleUpdate }:
           description: result.message || `${result.items.length} items found in the file.`
         });
         
-        // Auto import items if they're already saved to DB
         if (result.items.some(item => 'id' in item && item.id)) {
           if (onScheduleUpdate) {
             onScheduleUpdate();
@@ -285,10 +270,8 @@ export function ScheduleComparison({ project, scheduleItems, onScheduleUpdate }:
             description: `${result.items.length} items have been imported into your schedule.`
           });
         } else {
-          // Update batch update dialog with parsed items
           setItemsToUpdate(result.items.map(item => ({
-            ...item,
-            id: '', // Will be assigned when saved
+            id: '',
             projectId: project.id,
             task: item.task || '',
             plannedStart: item.plannedStart || '',
@@ -297,9 +280,8 @@ export function ScheduleComparison({ project, scheduleItems, onScheduleUpdate }:
             actualEnd: item.actualEnd || '',
             delayDays: item.delayDays || 0,
             description: item.description || ''
-          })) as ScheduleItem[]);
+          })));
           
-          // Close upload dialog and open batch update dialog
           setIsUploadDialogOpen(false);
           setIsBatchUpdateDialogOpen(true);
         }
@@ -314,7 +296,6 @@ export function ScheduleComparison({ project, scheduleItems, onScheduleUpdate }:
     }
   };
 
-  // Import parsed items
   const handleImportItems = async () => {
     if (parsedItems.length === 0) return;
     
@@ -324,10 +305,8 @@ export function ScheduleComparison({ project, scheduleItems, onScheduleUpdate }:
       let successCount = 0;
       let errorCount = 0;
       
-      // Create each item
       for (const item of parsedItems) {
         try {
-          // Skip items that already have an ID (already saved to DB)
           if ('id' in item && item.id) {
             successCount++;
             continue;
@@ -349,18 +328,15 @@ export function ScheduleComparison({ project, scheduleItems, onScheduleUpdate }:
         }
       }
       
-      // Close dialog and show success message
       setIsUploadDialogOpen(false);
       toast({
         title: "Import Complete",
         description: `Successfully imported ${successCount} items. ${errorCount > 0 ? `Failed to import ${errorCount} items.` : ''}`
       });
       
-      // Reset file and parsed items
       setSelectedFile(null);
       setParsedItems([]);
       
-      // Notify parent to refresh data
       if (onScheduleUpdate) {
         onScheduleUpdate();
       }
@@ -376,7 +352,6 @@ export function ScheduleComparison({ project, scheduleItems, onScheduleUpdate }:
     }
   };
 
-  // Handle batch update of actual dates
   const handleBatchUpdate = async () => {
     if (itemsToUpdate.length === 0) return;
     
@@ -386,10 +361,8 @@ export function ScheduleComparison({ project, scheduleItems, onScheduleUpdate }:
       let successCount = 0;
       let errorCount = 0;
       
-      // Process each item
       for (const item of itemsToUpdate) {
         try {
-          // Calculate delay days if both actual dates are provided
           let delayDays = 0;
           if (item.actualStart && item.actualEnd && item.plannedStart && item.plannedEnd) {
             const actualEndDate = new Date(item.actualEnd);
@@ -403,13 +376,10 @@ export function ScheduleComparison({ project, scheduleItems, onScheduleUpdate }:
             delayDays
           };
           
-          // If item has an id, update it, otherwise create new
           let result;
           if (item.id && item.id.length > 0 && item.id !== '') {
-            // Update existing item
             result = await updateScheduleItem(item.id, itemWithDelay);
           } else {
-            // Create new item
             result = await createScheduleItem(itemWithDelay);
           }
           
@@ -424,17 +394,14 @@ export function ScheduleComparison({ project, scheduleItems, onScheduleUpdate }:
         }
       }
       
-      // Close dialog and show success message
       setIsBatchUpdateDialogOpen(false);
       toast({
         title: "Update Complete",
         description: `Successfully processed ${successCount} items. ${errorCount > 0 ? `Failed to process ${errorCount} items.` : ''}`
       });
       
-      // Reset batch update items
       setItemsToUpdate([]);
       
-      // Notify parent to refresh data
       if (onScheduleUpdate) {
         onScheduleUpdate();
       }
@@ -450,12 +417,10 @@ export function ScheduleComparison({ project, scheduleItems, onScheduleUpdate }:
     }
   };
 
-  // Handle add new item
   const handleAddItem = async () => {
     setLoading(true);
 
     try {
-      // Calculate delay days if both actual dates are provided
       let delayDays = 0;
       if (newItem.actualStart && newItem.actualEnd && newItem.plannedStart && newItem.plannedEnd) {
         const actualEndDate = new Date(newItem.actualEnd);
@@ -464,7 +429,6 @@ export function ScheduleComparison({ project, scheduleItems, onScheduleUpdate }:
         if (delayDays < 0) delayDays = 0;
       }
 
-      // Create new schedule item
       const itemWithDelay = {
         ...newItem,
         delayDays
@@ -473,14 +437,12 @@ export function ScheduleComparison({ project, scheduleItems, onScheduleUpdate }:
       const createdItem = await createScheduleItem(itemWithDelay);
 
       if (createdItem) {
-        // Close dialog and show success message
         setIsAddDialogOpen(false);
         toast({
           title: "Success",
           description: `Schedule item "${newItem.task}" was added.`
         });
 
-        // Reset form
         setNewItem({
           projectId: project.id,
           task: "",
@@ -492,7 +454,6 @@ export function ScheduleComparison({ project, scheduleItems, onScheduleUpdate }:
           description: ""
         });
         
-        // Notify parent to refresh data
         if (onScheduleUpdate) {
           onScheduleUpdate();
         }
@@ -509,14 +470,12 @@ export function ScheduleComparison({ project, scheduleItems, onScheduleUpdate }:
     }
   };
 
-  // Handle update item
   const handleUpdateItem = async () => {
     if (!selectedItem || !selectedItem.id) return;
     
     setLoading(true);
 
     try {
-      // Calculate delay days if both actual dates are provided
       let delayDays = 0;
       if (selectedItem.actualStart && selectedItem.actualEnd && selectedItem.plannedStart && selectedItem.plannedEnd) {
         const actualEndDate = new Date(selectedItem.actualEnd);
@@ -525,7 +484,6 @@ export function ScheduleComparison({ project, scheduleItems, onScheduleUpdate }:
         if (delayDays < 0) delayDays = 0;
       }
 
-      // Update schedule item
       const itemWithDelay = {
         ...selectedItem,
         delayDays
@@ -534,17 +492,14 @@ export function ScheduleComparison({ project, scheduleItems, onScheduleUpdate }:
       const updatedItem = await updateScheduleItem(selectedItem.id, itemWithDelay);
 
       if (updatedItem) {
-        // Close dialog and show success message
         setIsUpdateDialogOpen(false);
         toast({
           title: "Success",
           description: `Schedule item "${selectedItem.task}" was updated.`
         });
 
-        // Reset selected item
         setSelectedItem(null);
         
-        // Notify parent to refresh data
         if (onScheduleUpdate) {
           onScheduleUpdate();
         }
@@ -561,13 +516,11 @@ export function ScheduleComparison({ project, scheduleItems, onScheduleUpdate }:
     }
   };
 
-  // Open delete confirmation dialog
   const openDeleteDialog = (id: string) => {
     setItemToDelete(id);
     setIsConfirmDeleteOpen(true);
   };
 
-  // Handle delete item
   const handleDeleteItem = async () => {
     if (!itemToDelete) {
       setIsConfirmDeleteOpen(false);
@@ -588,7 +541,6 @@ export function ScheduleComparison({ project, scheduleItems, onScheduleUpdate }:
           description: "Schedule item was deleted."
         });
         
-        // Notify parent to refresh data
         if (onScheduleUpdate) {
           onScheduleUpdate();
         }
@@ -607,7 +559,6 @@ export function ScheduleComparison({ project, scheduleItems, onScheduleUpdate }:
     }
   };
 
-  // Format date for display
   const formatDate = (dateStr: string) => {
     if (!dateStr) return "-";
     try {
@@ -618,7 +569,6 @@ export function ScheduleComparison({ project, scheduleItems, onScheduleUpdate }:
     }
   };
 
-  // Handle batch update form change
   const handleBatchItemChange = (index: number, field: keyof ScheduleItem, value: any) => {
     setItemsToUpdate(prevItems => {
       const newItems = [...prevItems];
@@ -627,7 +577,6 @@ export function ScheduleComparison({ project, scheduleItems, onScheduleUpdate }:
         [field]: value
       };
       
-      // Recalculate delay days if actual dates changed
       if ((field === 'actualStart' || field === 'actualEnd') && 
           newItems[index].actualStart && 
           newItems[index].actualEnd && 
@@ -644,12 +593,10 @@ export function ScheduleComparison({ project, scheduleItems, onScheduleUpdate }:
     });
   };
 
-  // Filter for items with missing actual dates
   const getItemsMissingActualDates = () => {
     return scheduleItems.filter(item => !item.actualStart || !item.actualEnd);
   };
 
-  // Open batch update dialog with existing items
   const openActualDatesDialog = () => {
     const missingItems = getItemsMissingActualDates();
     setItemsToUpdate(missingItems);
@@ -686,7 +633,6 @@ export function ScheduleComparison({ project, scheduleItems, onScheduleUpdate }:
         </div>
       </CardHeader>
       <CardContent>
-        {/* Storage error alert */}
         {storageAlert.show && (
           <Alert variant="destructive" className="mb-4">
             <AlertCircle className="h-4 w-4" />
@@ -833,7 +779,6 @@ export function ScheduleComparison({ project, scheduleItems, onScheduleUpdate }:
         </Tabs>
       </CardContent>
 
-      {/* Add Item Dialog */}
       <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
         <DialogContent className="sm:max-w-[550px]">
           <DialogHeader>
@@ -928,7 +873,6 @@ export function ScheduleComparison({ project, scheduleItems, onScheduleUpdate }:
         </DialogContent>
       </Dialog>
 
-      {/* Update Item Dialog */}
       <Dialog open={isUpdateDialogOpen} onOpenChange={setIsUpdateDialogOpen}>
         <DialogContent className="sm:max-w-[550px]">
           <DialogHeader>
@@ -1064,7 +1008,6 @@ export function ScheduleComparison({ project, scheduleItems, onScheduleUpdate }:
         </DialogContent>
       </Dialog>
 
-      {/* Batch Update Actual Dates Dialog */}
       <Dialog open={isBatchUpdateDialogOpen} onOpenChange={setIsBatchUpdateDialogOpen}>
         <DialogContent className="sm:max-w-[800px] max-h-[80vh] overflow-auto">
           <DialogHeader>
@@ -1157,7 +1100,6 @@ export function ScheduleComparison({ project, scheduleItems, onScheduleUpdate }:
         </DialogContent>
       </Dialog>
 
-      {/* File Upload Dialog */}
       <Dialog open={isUploadDialogOpen} onOpenChange={setIsUploadDialogOpen}>
         <DialogContent className="sm:max-w-[550px]">
           <DialogHeader>
@@ -1288,7 +1230,6 @@ export function ScheduleComparison({ project, scheduleItems, onScheduleUpdate }:
         </DialogContent>
       </Dialog>
       
-      {/* Confirm Delete Dialog */}
       <Dialog open={isConfirmDeleteOpen} onOpenChange={setIsConfirmDeleteOpen}>
         <DialogContent className="sm:max-w-[400px]">
           <DialogHeader>
