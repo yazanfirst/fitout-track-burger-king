@@ -1,4 +1,3 @@
-
 import { supabase } from '@/integrations/supabase/client';
 import { Project, ScheduleItem, OrderItem, ResponsibilityItem } from '@/data/mockData';
 import { Database } from '@/integrations/supabase/types';
@@ -77,8 +76,8 @@ export const getProjects = async () => {
       startDate: project.start_date,
       endDate: project.end_date,
       budget: project.budget || 0,
-      contractorProgress: 0,
-      ownerProgress: 0,
+      contractorProgress: project.contractor_progress || 0,
+      ownerProgress: project.owner_progress || 0,
       brand: 'BK' as 'BK' | 'TC',
       status: {
         orders: 0,
@@ -217,6 +216,8 @@ export const updateProject = async (projectId: string, updates: Partial<Project>
     if ('budget' in updates) dbUpdates.budget = updates.budget;
     if ('startDate' in updates) dbUpdates.start_date = updates.startDate;
     if ('endDate' in updates) dbUpdates.end_date = updates.endDate;
+    if ('contractorProgress' in updates) dbUpdates.contractor_progress = updates.contractorProgress;
+    if ('ownerProgress' in updates) dbUpdates.owner_progress = updates.ownerProgress;
     
     if ('status' in updates && typeof updates.status === 'string') {
       dbUpdates.status = updates.status;
@@ -250,8 +251,8 @@ export const updateProject = async (projectId: string, updates: Partial<Project>
       startDate: data.start_date,
       endDate: data.end_date,
       budget: data.budget || 0,
-      contractorProgress: 0,
-      ownerProgress: 0,
+      contractorProgress: data.contractor_progress || 0,
+      ownerProgress: data.owner_progress || 0,
       brand: 'BK' as 'BK' | 'TC',
       status: {
         orders: 0,
@@ -781,5 +782,115 @@ export const parseScheduleFile = async (projectId: string, file: File): Promise<
   } catch (error) {
     console.error('Error parsing schedule file:', error);
     return { error: "Failed to parse file" };
+  }
+};
+
+// Update responsibility status and refresh project progress
+export const updateResponsibilityStatus = async (projectId: string, itemId: string, newStatus: string) => {
+  try {
+    // Update responsibility status
+    const { error } = await supabase
+      .from('responsibilities')
+      .update({
+        status: newStatus,
+        completed_at: newStatus === 'completed' ? new Date().toISOString() : null
+      })
+      .eq('id', itemId);
+      
+    if (error) {
+      console.error('Error updating responsibility status:', error);
+      return false;
+    }
+    
+    // Calculate updated progress
+    const { data: respData } = await supabase
+      .from('responsibilities')
+      .select('*')
+      .eq('project_id', projectId);
+    
+    const { data: scheduleData } = await supabase
+      .from('schedules')
+      .select('*')
+      .eq('project_id', projectId);
+    
+    let contractorProgress = 0;
+    
+    if (respData && respData.length > 0) {
+      const completedResp = respData.filter(r => r.status === 'completed').length;
+      contractorProgress += Math.round((completedResp / respData.length) * 50);
+    }
+    
+    if (scheduleData && scheduleData.length > 0) {
+      const completedSchedule = scheduleData.filter(s => s.status === 'completed').length;
+      contractorProgress += Math.round((completedSchedule / scheduleData.length) * 50);
+    }
+    
+    // Update project progress
+    await supabase
+      .from('projects')
+      .update({
+        contractor_progress: contractorProgress
+      })
+      .eq('id', projectId);
+    
+    return true;
+  } catch (error) {
+    console.error('Error in updateResponsibilityStatus:', error);
+    return false;
+  }
+};
+
+// Update schedule item status and refresh project progress
+export const updateScheduleStatus = async (projectId: string, itemId: string, newStatus: string) => {
+  try {
+    // Update schedule status
+    const { error } = await supabase
+      .from('schedules')
+      .update({
+        status: newStatus,
+        actual_end: newStatus === 'completed' ? new Date().toISOString().split('T')[0] : null
+      })
+      .eq('id', itemId);
+      
+    if (error) {
+      console.error('Error updating schedule status:', error);
+      return false;
+    }
+    
+    // Calculate updated progress
+    const { data: respData } = await supabase
+      .from('responsibilities')
+      .select('*')
+      .eq('project_id', projectId);
+    
+    const { data: scheduleData } = await supabase
+      .from('schedules')
+      .select('*')
+      .eq('project_id', projectId);
+    
+    let contractorProgress = 0;
+    
+    if (respData && respData.length > 0) {
+      const completedResp = respData.filter(r => r.status === 'completed').length;
+      contractorProgress += Math.round((completedResp / respData.length) * 50);
+    }
+    
+    if (scheduleData && scheduleData.length > 0) {
+      const completedSchedule = scheduleData.filter(s => s.status === 'completed').length;
+      contractorProgress += Math.round((completedSchedule / scheduleData.length) * 50);
+    }
+    
+    // Update project progress
+    await supabase
+      .from('projects')
+      .update({
+        contractor_progress: contractorProgress
+      })
+      .eq('id', projectId);
+    
+    return true;
+  } catch (error) {
+    console.error('Error in updateScheduleStatus:', error);
+    return false;
   }
 };

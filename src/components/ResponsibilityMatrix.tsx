@@ -6,6 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
+import { updateResponsibilityStatus } from "@/lib/api";
 import {
   Select,
   SelectContent,
@@ -200,39 +201,30 @@ export function ResponsibilityMatrix({ project, responsibilities: initialRespons
     }
   };
   
-  const updateResponsibilityStatus = async (itemId: string, newStatus: string) => {
+  const handleStatusUpdate = async (itemId: string, newStatus: string) => {
     try {
-      const { error } = await supabase
-        .from('responsibilities')
-        .update({
-          status: newStatus,
-          completed_at: newStatus === 'completed' ? new Date().toISOString() : null,
-        })
-        .eq('id', itemId);
+      const success = await updateResponsibilityStatus(project.id, itemId, newStatus);
+      
+      if (success) {
+        setResponsibilities(prev => 
+          prev.map(item => 
+            item.id === itemId ? { ...item, status: newStatus } : item
+          )
+        );
         
-      if (error) {
-        console.error("Error updating responsibility:", error);
+        toast({
+          title: "Status Updated",
+          description: `Task status updated to ${newStatus}`,
+        });
+      } else {
         toast({
           title: "Error",
           description: "Failed to update status",
           variant: "destructive",
         });
-        return;
       }
-      
-      setResponsibilities(prev => 
-        prev.map(item => 
-          item.id === itemId ? { ...item, status: newStatus } : item
-        )
-      );
-      
-      toast({
-        title: "Status Updated",
-        description: `Task status updated to ${newStatus}`,
-      });
-      
     } catch (error) {
-      console.error("Error in updateResponsibilityStatus:", error);
+      console.error("Error in handleStatusUpdate:", error);
       toast({
         title: "Error",
         description: "An unexpected error occurred",
@@ -480,7 +472,7 @@ export function ResponsibilityMatrix({ project, responsibilities: initialRespons
                                 <Button variant="outline">Cancel</Button>
                               </DialogClose>
                               <DialogClose asChild>
-                                <Button onClick={() => updateResponsibilityStatus(item.id, 'completed')}>
+                                <Button onClick={() => handleStatusUpdate(item.id, 'completed')}>
                                   Mark as Completed
                                 </Button>
                               </DialogClose>

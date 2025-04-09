@@ -47,9 +47,31 @@ export function ProjectOverview({ project, onNotesChange }: ProjectOverviewProps
       if (orderError) throw orderError;
       
       const totalOrders = orderData.length;
-      const completedOrders = orderData.filter(o => o.invoice_status === '100%').length;
+      const completedOrders = orderData.filter(o => o.status === 'delivered').length;
       const lposReceived = orderData.filter(o => o.lpo_received).length;
       const completedInvoices = orderData.filter(o => o.invoice_status === '100%').length;
+      
+      // Get responsibility counts
+      const { data: responsibilityData, error: respError } = await supabase
+        .from('responsibilities')
+        .select('*')
+        .eq('project_id', project.id);
+        
+      if (respError && respError.code !== 'PGRST116') throw respError;
+      
+      const totalResponsibilities = responsibilityData?.length || 0;
+      const completedResponsibilities = responsibilityData?.filter(r => r.status === 'completed').length || 0;
+      
+      // Get schedule items counts
+      const { data: scheduleData, error: scheduleError } = await supabase
+        .from('schedules')
+        .select('*')
+        .eq('project_id', project.id);
+        
+      if (scheduleError && scheduleError.code !== 'PGRST116') throw scheduleError;
+      
+      const totalScheduleItems = scheduleData?.length || 0;
+      const completedScheduleItems = scheduleData?.filter(s => s.status === 'completed').length || 0;
       
       // Get drawings count
       const { data: drawingData, error: drawingError } = await supabase
@@ -61,25 +83,35 @@ export function ProjectOverview({ project, onNotesChange }: ProjectOverviewProps
       
       const totalDrawings = drawingData?.length || 0;
       
+      // Calculate overall progress based on completed responsibilities and schedule items
+      let contractorProgress = 0;
+      let ownerProgress = 0;
+      
+      if (totalResponsibilities > 0) {
+        contractorProgress += Math.round((completedResponsibilities / totalResponsibilities) * 50);
+      }
+      
+      if (totalScheduleItems > 0) {
+        contractorProgress += Math.round((completedScheduleItems / totalScheduleItems) * 50);
+      }
+      
+      if (totalOrders > 0) {
+        ownerProgress = Math.round((lposReceived / totalOrders) * 100);
+      }
+      
       // Update project status
       const newStatus = {
         orders: completedOrders,
-        ordersTotal: totalOrders || 10,
+        ordersTotal: Math.max(totalOrders, 1),
         lpos: lposReceived,
-        lposTotal: totalOrders || 10,
+        lposTotal: Math.max(totalOrders, 1),
         drawings: totalDrawings,
-        drawingsTotal: 10,
+        drawingsTotal: Math.max(totalDrawings, 1),
         invoices: completedInvoices,
-        invoicesTotal: totalOrders || 10,
-        contractorProgress: project.contractorProgress || 0,
-        ownerProgress: project.ownerProgress || 0
+        invoicesTotal: Math.max(totalOrders, 1),
+        contractorProgress,
+        ownerProgress
       };
-      
-      // Calculate progress
-      if (totalOrders > 0) {
-        newStatus.contractorProgress = Math.round((completedOrders / totalOrders) * 100);
-        newStatus.ownerProgress = Math.round((lposReceived / totalOrders) * 100);
-      }
       
       setProjectStatus(newStatus);
       
@@ -87,8 +119,8 @@ export function ProjectOverview({ project, onNotesChange }: ProjectOverviewProps
       await supabase
         .from('projects')
         .update({
-          contractor_progress: newStatus.contractorProgress,
-          owner_progress: newStatus.ownerProgress
+          contractor_progress: contractorProgress,
+          owner_progress: ownerProgress
         })
         .eq('id', project.id);
         
@@ -177,7 +209,7 @@ export function ProjectOverview({ project, onNotesChange }: ProjectOverviewProps
             </div>
             <div>
               <ProgressBar 
-                progress={(projectStatus.contractorProgress + projectStatus.ownerProgress) / 2} 
+                progress={Math.round((projectStatus.contractorProgress + projectStatus.ownerProgress) / 2)} 
                 colorClass="bg-green-500" 
                 label="Overall Progress" 
               />
