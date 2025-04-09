@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { Sidebar } from "@/components/Sidebar";
@@ -12,6 +13,7 @@ import { ReportGenerator } from "@/components/ReportGenerator";
 import { Project } from "@/data/mockData";
 import { CreateProject } from "@/components/CreateProject";
 import { getProjects, getScheduleItems, getOrderItems, getResponsibilityItems, updateProject, initializeDatabase, deleteProject } from "@/lib/api";
+import { StorageErrorAlert } from "@/components/StorageErrorAlert";
 import { 
   AlertDialog, 
   AlertDialogAction, 
@@ -232,7 +234,7 @@ const Index = () => {
     }
   };
   
-  const refreshScheduleData = () => {
+  const refreshProjectData = () => {
     if (selectedProject) {
       fetchProjectData(selectedProject.id);
     }
@@ -252,6 +254,7 @@ const Index = () => {
   return (
     <div className="flex flex-col md:flex-row min-h-screen">
       <Sidebar />
+      <StorageErrorAlert />
       
       <div className="flex-1 md:ml-20">
         {selectedProject && (
@@ -282,7 +285,7 @@ const Index = () => {
                   <ScheduleComparison 
                     project={selectedProject}
                     scheduleItems={scheduleItems}
-                    onScheduleUpdate={refreshScheduleData}
+                    onScheduleUpdate={refreshProjectData}
                   />
                   
                   <SitePhotos project={selectedProject} />

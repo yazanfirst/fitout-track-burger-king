@@ -1,12 +1,14 @@
 
-import { useState } from "react";
-import { CalendarIcon, ImagePlus, Trash2 } from "lucide-react";
+import { useState, useEffect } from "react";
+import { CalendarIcon, ImagePlus, Trash2, AlertTriangle } from "lucide-react";
 import { Project } from "@/data/mockData";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
+import { useToast } from "@/hooks/use-toast";
+import { supabase } from "@/integrations/supabase/client";
 import {
   Popover,
   PopoverContent,
@@ -14,6 +16,7 @@ import {
 } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { format } from "date-fns";
+import { uploadFile } from "@/lib/api";
 
 interface SitePhotosProps {
   project: Project;
@@ -32,25 +35,86 @@ export function SitePhotos({ project }: SitePhotosProps) {
   const [uploadedPhotos, setUploadedPhotos] = useState<File[]>([]);
   const [description, setDescription] = useState("");
   const [date, setDate] = useState<Date | undefined>(new Date());
+  const [photoGroups, setPhotoGroups] = useState<PhotoGroup[]>([]);
+  const [isUploading, setIsUploading] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+  const { toast } = useToast();
   
-  // Mock photo groups by date
-  const photoGroups: PhotoGroup[] = [
-    {
-      date: "2023-05-15",
-      photos: [
-        { id: "1", url: "https://images.unsplash.com/photo-1552566626-52f8b828add9", description: "Site preparation" },
-        { id: "2", url: "https://images.unsplash.com/photo-1541888946425-d81bb19240f5", description: "Foundation work" },
-      ]
-    },
-    {
-      date: "2023-05-10",
-      photos: [
-        { id: "3", url: "https://images.unsplash.com/photo-1521790361543-f645cf042ec4", description: "Initial site survey" },
-        { id: "4", url: "https://images.unsplash.com/photo-1531834685032-c34bf0d84c77", description: "Team meeting" },
-        { id: "5", url: "https://images.unsplash.com/photo-1504307651254-35680f356dfd", description: "Equipment delivery" },
-      ]
+  useEffect(() => {
+    fetchPhotos();
+  }, [project.id]);
+  
+  const fetchPhotos = async () => {
+    setIsLoading(true);
+    try {
+      const { data, error } = await supabase
+        .from('photos')
+        .select('*')
+        .eq('project_id', project.id)
+        .order('photo_date', { ascending: false });
+      
+      if (error) {
+        console.error("Error fetching photos:", error);
+        toast({
+          title: "Error",
+          description: "Failed to load photos",
+          variant: "destructive",
+        });
+        
+        // Use mock data as fallback
+        const mockGroups: PhotoGroup[] = [
+          {
+            date: "2023-05-15",
+            photos: [
+              { id: "1", url: "https://images.unsplash.com/photo-1552566626-52f8b828add9", description: "Site preparation" },
+              { id: "2", url: "https://images.unsplash.com/photo-1541888946425-d81bb19240f5", description: "Foundation work" },
+            ]
+          },
+          {
+            date: "2023-05-10",
+            photos: [
+              { id: "3", url: "https://images.unsplash.com/photo-1521790361543-f645cf042ec4", description: "Initial site survey" },
+              { id: "4", url: "https://images.unsplash.com/photo-1531834685032-c34bf0d84c77", description: "Team meeting" },
+              { id: "5", url: "https://images.unsplash.com/photo-1504307651254-35680f356dfd", description: "Equipment delivery" },
+            ]
+          }
+        ];
+        setPhotoGroups(mockGroups);
+      } else {
+        // Group photos by date
+        const groupedPhotos: Record<string, any[]> = {};
+        
+        data?.forEach(photo => {
+          const photoDate = photo.photo_date;
+          if (!groupedPhotos[photoDate]) {
+            groupedPhotos[photoDate] = [];
+          }
+          
+          groupedPhotos[photoDate].push({
+            id: photo.id,
+            url: photo.file_url,
+            description: photo.caption || '',
+          });
+        });
+        
+        const formattedGroups: PhotoGroup[] = Object.keys(groupedPhotos).map(date => ({
+          date,
+          photos: groupedPhotos[date]
+        }));
+        
+        setPhotoGroups(formattedGroups.length > 0 ? formattedGroups : []);
+      }
+    } catch (error) {
+      console.error("Error in fetchPhotos:", error);
+      toast({
+        title: "Error",
+        description: "An unexpected error occurred while fetching photos",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoading(false);
     }
-  ];
+  };
 
   const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files.length > 0) {
@@ -58,19 +122,75 @@ export function SitePhotos({ project }: SitePhotosProps) {
     }
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    // This would typically upload the photos to a server
-    console.log("Uploading photos:", uploadedPhotos);
-    console.log("Description:", description);
-    console.log("Date:", date);
+    if (uploadedPhotos.length === 0 || !date) return;
     
-    // Reset form
-    setUploadedPhotos([]);
-    setDescription("");
+    setIsUploading(true);
+    toast({
+      title: "Uploading Photos",
+      description: `Uploading ${uploadedPhotos.length} photo(s)...`,
+    });
+    
+    try {
+      for (const file of uploadedPhotos) {
+        // 1. Upload the file to storage
+        const fileUrl = await uploadFile(file, project.id, 'photo');
+        
+        if (!fileUrl) {
+          toast({
+            title: "Upload Failed",
+            description: `Failed to upload ${file.name}`,
+            variant: "destructive",
+          });
+          continue;
+        }
+        
+        // 2. Save photo record to database
+        const { data, error } = await supabase
+          .from('photos')
+          .insert({
+            project_id: project.id,
+            file_url: fileUrl,
+            caption: description,
+            photo_date: date.toISOString().split('T')[0],
+            taken_by: 'User Upload'
+          });
+          
+        if (error) {
+          console.error("Error saving photo record:", error);
+          toast({
+            title: "Database Error",
+            description: `Failed to save photo record for ${file.name}`,
+            variant: "destructive",
+          });
+        }
+      }
+      
+      // Refresh photos list
+      await fetchPhotos();
+      
+      toast({
+        title: "Upload Complete",
+        description: `Successfully uploaded ${uploadedPhotos.length} photo(s)`,
+      });
+      
+      // Reset form
+      setUploadedPhotos([]);
+      setDescription("");
+    } catch (error) {
+      console.error("Error in upload process:", error);
+      toast({
+        title: "Upload Error",
+        description: "An unexpected error occurred during photo upload",
+        variant: "destructive",
+      });
+    } finally {
+      setIsUploading(false);
+    }
   };
 
-  const removeUpload = (index: number) => {
+  const removeFile = (index: number) => {
     setUploadedPhotos(prev => prev.filter((_, i) => i !== index));
   };
 
@@ -134,8 +254,9 @@ export function SitePhotos({ project }: SitePhotosProps) {
                     multiple
                     onChange={handlePhotoUpload}
                     className="flex-1"
+                    disabled={isUploading}
                   />
-                  <Button type="button" variant="outline" size="icon">
+                  <Button type="button" variant="outline" size="icon" disabled={isUploading}>
                     <ImagePlus className="h-4 w-4" />
                   </Button>
                 </div>
@@ -153,6 +274,7 @@ export function SitePhotos({ project }: SitePhotosProps) {
                   value={description}
                   onChange={(e) => setDescription(e.target.value)}
                   className="min-h-[80px]"
+                  disabled={isUploading}
                 />
               </div>
               
@@ -169,8 +291,9 @@ export function SitePhotos({ project }: SitePhotosProps) {
                         />
                         <button
                           type="button"
-                          onClick={() => removeUpload(index)}
+                          onClick={() => removeFile(index)}
                           className="absolute top-0 right-0 bg-red-500 text-white p-1 rounded-full transform translate-x-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity"
+                          disabled={isUploading}
                         >
                           <Trash2 className="h-3 w-3" />
                         </button>
@@ -183,9 +306,9 @@ export function SitePhotos({ project }: SitePhotosProps) {
               <Button 
                 type="submit" 
                 className="w-full" 
-                disabled={uploadedPhotos.length === 0 || !date}
+                disabled={uploadedPhotos.length === 0 || !date || isUploading}
               >
-                Upload Photos
+                {isUploading ? "Uploading..." : "Upload Photos"}
               </Button>
             </form>
           </CardContent>
@@ -196,7 +319,11 @@ export function SitePhotos({ project }: SitePhotosProps) {
             <CardTitle className="text-lg">Photo Gallery</CardTitle>
           </CardHeader>
           <CardContent>
-            {photoGroups.length > 0 ? (
+            {isLoading ? (
+              <div className="py-8 flex justify-center items-center">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
+              </div>
+            ) : photoGroups.length > 0 ? (
               <div className="space-y-6">
                 {photoGroups.map((group) => (
                   <div key={group.date} className="space-y-3">
@@ -209,11 +336,20 @@ export function SitePhotos({ project }: SitePhotosProps) {
                           key={photo.id} 
                           className="group relative overflow-hidden rounded-md"
                         >
-                          <img 
-                            src={photo.url} 
-                            alt={photo.description}
-                            className="h-32 w-full object-cover transition-transform duration-200 group-hover:scale-105"
-                          />
+                          {photo.url ? (
+                            <img 
+                              src={photo.url} 
+                              alt={photo.description}
+                              className="h-32 w-full object-cover transition-transform duration-200 group-hover:scale-105"
+                              onError={(e) => {
+                                (e.target as HTMLImageElement).src = "https://images.unsplash.com/photo-1552566626-52f8b828add9";
+                              }}
+                            />
+                          ) : (
+                            <div className="h-32 w-full bg-gray-200 flex items-center justify-center">
+                              <AlertTriangle className="h-8 w-8 text-gray-400" />
+                            </div>
+                          )}
                           <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/80 to-transparent p-3">
                             <p className="text-xs text-white truncate">
                               {photo.description}

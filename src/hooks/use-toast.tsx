@@ -7,7 +7,7 @@ import type {
 } from "@/components/ui/toast";
 
 const TOAST_LIMIT = 5;
-const TOAST_REMOVE_DELAY = 5000; // Changed from 1000000 (too long) to 5000ms (5 seconds)
+const TOAST_REMOVE_DELAY = 5000; // 5 seconds for toast display
 
 type ToasterToast = ToastProps & {
   id: string;
@@ -91,8 +91,6 @@ export const reducer = (state: State, action: Action): State => {
     case "DISMISS_TOAST": {
       const { toastId } = action;
 
-      // ! Side effects ! - This could be extracted into a dismissToast() action,
-      // but I'll keep it here for simplicity
       if (toastId) {
         addToRemoveQueue(toastId);
       } else {

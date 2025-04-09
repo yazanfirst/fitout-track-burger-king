@@ -1,5 +1,5 @@
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { CalendarClock, Check, Clipboard, FileText, Upload } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Project } from "@/data/mockData";
@@ -7,6 +7,8 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
 import { ProgressBar } from "./ProgressBar";
+import { useToast } from "@/hooks/use-toast";
+import { supabase } from "@/integrations/supabase/client";
 
 interface ProjectOverviewProps {
   project: Project;
@@ -14,7 +16,86 @@ interface ProjectOverviewProps {
 }
 
 export function ProjectOverview({ project, onNotesChange }: ProjectOverviewProps) {
-  const [notes, setNotes] = useState<string>(project.notes);
+  const [notes, setNotes] = useState<string>(project.notes || "");
+  const [projectStatus, setProjectStatus] = useState({
+    orders: 0,
+    ordersTotal: 10,
+    lpos: 0,
+    lposTotal: 10,
+    drawings: 0,
+    drawingsTotal: 10,
+    invoices: 0,
+    invoicesTotal: 10,
+    contractorProgress: 0,
+    ownerProgress: 0
+  });
+  const { toast } = useToast();
+  
+  useEffect(() => {
+    setNotes(project.notes || "");
+    fetchProjectStats();
+  }, [project.id]);
+  
+  const fetchProjectStats = async () => {
+    try {
+      // Get order counts
+      const { data: orderData, error: orderError } = await supabase
+        .from('orders')
+        .select('*')
+        .eq('project_id', project.id);
+        
+      if (orderError) throw orderError;
+      
+      const totalOrders = orderData.length;
+      const completedOrders = orderData.filter(o => o.invoice_status === '100%').length;
+      const lposReceived = orderData.filter(o => o.lpo_received).length;
+      const completedInvoices = orderData.filter(o => o.invoice_status === '100%').length;
+      
+      // Get drawings count
+      const { data: drawingData, error: drawingError } = await supabase
+        .from('drawings')
+        .select('*')
+        .eq('project_id', project.id);
+        
+      if (drawingError && drawingError.code !== 'PGRST116') throw drawingError;
+      
+      const totalDrawings = drawingData?.length || 0;
+      
+      // Update project status
+      const newStatus = {
+        orders: completedOrders,
+        ordersTotal: totalOrders || 10,
+        lpos: lposReceived,
+        lposTotal: totalOrders || 10,
+        drawings: totalDrawings,
+        drawingsTotal: 10,
+        invoices: completedInvoices,
+        invoicesTotal: totalOrders || 10,
+        contractorProgress: project.contractorProgress || 0,
+        ownerProgress: project.ownerProgress || 0
+      };
+      
+      // Calculate progress
+      if (totalOrders > 0) {
+        newStatus.contractorProgress = Math.round((completedOrders / totalOrders) * 100);
+        newStatus.ownerProgress = Math.round((lposReceived / totalOrders) * 100);
+      }
+      
+      setProjectStatus(newStatus);
+      
+      // Update project progress in database
+      await supabase
+        .from('projects')
+        .update({
+          contractor_progress: newStatus.contractorProgress,
+          owner_progress: newStatus.ownerProgress
+        })
+        .eq('id', project.id);
+        
+    } catch (error) {
+      console.error("Error fetching project stats:", error);
+    }
+  };
 
   const handleNotesChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     setNotes(e.target.value);
@@ -22,14 +103,18 @@ export function ProjectOverview({ project, onNotesChange }: ProjectOverviewProps
 
   const handleSaveNotes = () => {
     onNotesChange(notes);
+    toast({
+      title: "Notes Saved",
+      description: "Your project notes have been saved successfully",
+    });
   };
 
   const statusCards = [
     {
       title: "Orders",
       icon: Clipboard,
-      current: project.status.orders,
-      total: project.status.ordersTotal,
+      current: projectStatus.orders,
+      total: projectStatus.ordersTotal,
       bgColor: "bg-blue-50",
       textColor: "text-blue-700",
       iconColor: "text-blue-500",
@@ -37,8 +122,8 @@ export function ProjectOverview({ project, onNotesChange }: ProjectOverviewProps
     {
       title: "LPOs",
       icon: FileText,
-      current: project.status.lpos,
-      total: project.status.lposTotal, 
+      current: projectStatus.lpos,
+      total: projectStatus.lposTotal, 
       bgColor: "bg-purple-50",
       textColor: "text-purple-700",
       iconColor: "text-purple-500",
@@ -46,8 +131,8 @@ export function ProjectOverview({ project, onNotesChange }: ProjectOverviewProps
     {
       title: "Drawings",
       icon: Upload,
-      current: project.status.drawings,
-      total: project.status.drawingsTotal,
+      current: projectStatus.drawings,
+      total: projectStatus.drawingsTotal,
       bgColor: "bg-amber-50",
       textColor: "text-amber-700", 
       iconColor: "text-amber-500",
@@ -55,8 +140,8 @@ export function ProjectOverview({ project, onNotesChange }: ProjectOverviewProps
     {
       title: "Invoices",
       icon: CalendarClock,
-      current: project.status.invoices,
-      total: project.status.invoicesTotal,
+      current: projectStatus.invoices,
+      total: projectStatus.invoicesTotal,
       bgColor: "bg-green-50",
       textColor: "text-green-700",
       iconColor: "text-green-500",
@@ -78,21 +163,21 @@ export function ProjectOverview({ project, onNotesChange }: ProjectOverviewProps
           <CardContent className="space-y-6">
             <div>
               <ProgressBar 
-                progress={project.contractorProgress} 
+                progress={projectStatus.contractorProgress} 
                 colorClass="bg-bk-red" 
                 label="Contractor Progress" 
               />
             </div>
             <div>
               <ProgressBar 
-                progress={project.ownerProgress} 
+                progress={projectStatus.ownerProgress} 
                 colorClass="bg-bk-gold" 
                 label="Owner Progress" 
               />
             </div>
             <div>
               <ProgressBar 
-                progress={(project.contractorProgress + project.ownerProgress) / 2} 
+                progress={(projectStatus.contractorProgress + projectStatus.ownerProgress) / 2} 
                 colorClass="bg-green-500" 
                 label="Overall Progress" 
               />
